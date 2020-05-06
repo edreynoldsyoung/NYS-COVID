@@ -19,6 +19,10 @@ check_load_pkgs <- function() {
                 message("installing the 'tidyverse' package")
                 install.packages(tidyverse)
         }
+        if(!require(ggrepel)) {
+                message("installing the 'ggrepel' package")
+                install.packages(ggrepel)
+        }     
         if(!require(lubridate)) {
                 message("installing the 'lubridate' package")
                 install.packages(lubridate)
@@ -132,6 +136,13 @@ state <- nys %>%
 ggplot(data=state) + 
      geom_point(mapping = aes(x=t, y=I1*100/T1)) + 
      geom_smooth(mapping = aes(x=t, y=I1*100/T1)) +
+     geom_label_repel(data = filter(state, t == max(t)), 
+                      aes(x=t, 
+                          y=I1*100/T1,
+                          label=sprintf("%.2f %%", I1*100/T1)),
+                      segment.color = "black",
+                      nudge_x = -3,
+                      nudge_y = -10) +
      geom_ribbon(aes(ymin = 0,
                      ymax = T1/500,
                      x=t),
