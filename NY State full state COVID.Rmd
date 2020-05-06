@@ -203,7 +203,8 @@ ggplot(data=nys) +
                  colour="green",
                  method = lm,
                  se=FALSE) +
-  facet_wrap(~county, ncol = 4)
+  facet_wrap(~county, ncol = 4) + 
+  theme(panel.background = element_rect(fill = "white")) 
 ```
 
 #  Cummulative Cases by County
@@ -225,7 +226,8 @@ ggplot(data=nys) +
                  colour="green",
                  method = lm,
                  se=FALSE) +
-  facet_wrap(~county, ncol = 4)
+  facet_wrap(~county, ncol = 4) + 
+  theme(panel.background = element_rect(fill = "white")) 
 ```
 
 # Percentage of Tests performed that were Positive by County
