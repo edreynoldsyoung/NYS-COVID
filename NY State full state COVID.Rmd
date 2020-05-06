@@ -1,0 +1,310 @@
+---
+title: 'New York State COVID-19'
+author: "Ed Young"
+date: "April 7, 2020"
+output:
+  html_document:
+    css: styles.css
+    highlight: null
+    theme: null
+  pdf_document: default
+  word_document: default
+  df_print: kable
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE,  warning=FALSE, message=FALSE)
+check_load_pkgs <- function() {
+        if(!require(tidyverse)) {
+                message("installing the 'tidyverse' package")
+                install.packages(tidyverse)
+        }
+        if(!require(lubridate)) {
+                message("installing the 'lubridate' package")
+                install.packages(lubridate)
+        }
+        if(!require(EpiEstim)) {
+                message("installing the 'EpiEstim' package")
+                install.packages(EpiEstim)
+        }
+        if(!require(RSocrata)) {
+                message("installing the 'RSocrata' package")
+                install.packages(RSocrata)
+        }
+        if(!require(knitr)) {
+                message("installing the 'knitr' package")
+                install.packages(knitr)
+        }
+        if(!require(sf)) {
+                message("installing the 'sf' package")
+                install.packages(sf)
+        }
+        if(!require(tigris)) {
+                message("installing the 'tigris' package")
+                install.packages(tigris)
+        }
+        if(!require(usmap)) {
+                message("installing the 'usmap' package")
+                install.packages(usmap)
+        }
+}
+check_load_pkgs()
+options(tigris_class = "sf")
+options(tigris_use_cache = TRUE)
+
+#nys<-read.socrata("https://health.data.ny.gov/resource/xdss-u53e.json")
+nys<-data.table::fread("/home/ed/repos/COVID/nys_back")
+```
+
+```{r initialize, include=FALSE}
+nys<-nys %>% 
+  select(t=test_date, I=new_positives, C=cumulative_number_of_positives, T=total_number_of_tests, county) %>%
+  mutate(t = as.Date(t), I=as.integer(I), C=as.integer(C), T=as.integer(T)) %>%
+  map_df(rev)
+```
+## This page was run on `r Sys.Date()`.  It is based on data from New York State Department of Health, most recently updated on `r max(nys$t)`.
+
+# New York State New Cases
+```{r NYS New}
+state <- nys %>% 
+  group_by(t) %>% 
+  summarise(S=sum(I))
+ggplot(data=state) +
+     geom_point(mapping = aes(x=t, y=S)) + 
+     labs(x="Date",
+          y="Log Scale of New Cases") +
+     scale_y_log10(breaks=c(1, 10, 100, 1000, 10000)) +
+     geom_vline(xintercept = as.Date("2020-03-20"), linetype=4) +
+     geom_label(label="Social Distancing Enforced",
+                x=as.Date("2020-03-20"),
+                y=0) +
+     geom_smooth(data = filter(state, t <= as.Date("2020-03-20")), 
+                 mapping = aes(x=t, y=S),
+                 colour="red",
+                 method = lm,
+                 se=FALSE,
+                 fullrange=TRUE) +
+     geom_smooth(data = filter(state, t >= as.Date("2020-03-20")), 
+                 mapping = aes(x=t, y=S),
+                 colour="green",
+                 se=FALSE)
+```
+
+\pagebreak
+
+# New York State Cummulative Cases
+
+```{r NYS Cummulative}
+state <- nys %>% 
+  group_by(t) %>% 
+  summarise(S=sum(C))
+ggplot(data=state) +
+     geom_point(mapping = aes(x=t, y=S)) + 
+     labs(x="Date",
+          y="Log Scale of Cummulative Cases") +
+     scale_y_log10(breaks=c(1, 10, 100, 1000, 10000)) +
+     geom_vline(xintercept = as.Date("2020-03-20"), linetype=4) +
+     geom_label(label="Social Distancing Enforced",
+                x=as.Date("2020-03-20"),
+                y=0) +
+     geom_smooth(data = filter(state, t <= as.Date("2020-03-20")), 
+                 mapping = aes(x=t, y=S),
+                 colour="red",
+                 method = lm,
+                 se=FALSE,
+                 fullrange=TRUE) +
+     geom_smooth(data = filter(state, t >= as.Date("2020-03-20")), 
+                 mapping = aes(x=t, y=S),
+                 colour="green",
+                 se=FALSE)
+```
+
+\pagebreak
+
+# New York State Percentage of Tests that were Positive
+
+The raw number of positive tests per day can vary depending on how many tests were performed on that day.  One way to normalize this variation is to look at the percentage of tests performed that were positive rather than the raw number of positive tests.
+
+```{r NYS Percentage}
+state <- nys %>% 
+  group_by(t) %>% 
+  summarise(I1=sum(I),
+            T1=sum(T))
+ggplot(data=state) + 
+     geom_point(mapping = aes(x=t, y=I1*100/T1)) + 
+     geom_smooth(mapping = aes(x=t, y=I1*100/T1)) +
+     geom_ribbon(aes(ymin = 0,
+                     ymax = T1/500,
+                     x=t),
+                 alpha = 0.3,
+                 fill = "tomato") +
+     scale_y_continuous(sec.axis = sec_axis(~.*500, name = "Total Tests Performed")) +
+     geom_vline(xintercept = as.Date("2020-03-20"), linetype=4) +
+     geom_hline(yintercept = 0) +
+     geom_label(label="Social Distancing Enforced",
+                x=as.Date("2020-03-20"),
+                y=0) +
+     labs(x="Date",
+          y="Percentage of Tests Performed that were Positive") +
+     theme(axis.title.y.right = element_text(color = "tomato"),
+           axis.text.y.right = element_text(color = "tomato"),
+           panel.background = element_rect(fill = "white")) 
+```
+
+\pagebreak
+
+# Estimation of R in New York State as a whole
+
+Transmissibility of a virus during an epidemic can be measured by the reproduction number R, the average number of secondary infections caused by a primary infected <a aria-describedby="footnote-label" href="#R"> individual</a>.  Statistical methods to estimate R have been developed which require only case incidence data and the distribution of the serial interval (the time between the onset of symptoms in the primary case and the onset of symptoms in the secondary cases). The distribution of the serial interval (mean and standard deviation) can be estimated by directly interviewing people who have been <a aria-describedby="footnote-label" href="#SI">infected</a>.  So long as some new infections continue to occur R will be greater than 0.  If R is less than 1 (each infected individual causes less than one other person to become infected, on average), we would expect the number of new cases each day to be less than the day before.  If R is greater than 1, we would expect the number of new cases to grow.  
+
+```{r NYS R}
+state <- nys %>% 
+  group_by(t) %>% 
+  summarise(S=sum(I))
+t_start <- seq(2, nrow(state)-3)
+t_end <- seq(5, nrow(state))
+R.instantaneous <- estimate_R(state$S, 
+                              method = "parametric_si",
+                              config = list(mean_si = 3.96, 
+                                            std_si = 4.75))
+estimate_R_plots(R.instantaneous, 
+                 what = "R", 
+                 options_R=list(xlab="Days Since First Reported Infection"), 
+                 legend = TRUE)
+```
+
+The estimate of the most recent R is <b> `r round(R.instantaneous$R$'Mean(R)'[length(R.instantaneous$R$t_start)], 3)` </b>
+\pagebreak
+
+```{r NYS R Histogram}
+R.sample <- sample_posterior_R(R.instantaneous, n=1000, window = length(R.instantaneous$R$t_start))
+hist(R.sample)
+```
+\pagebreak
+
+# Number of New Cases by County
+
+```{r County New, fig.height=30, fig.width=10}
+ggplot(data=nys) +
+     geom_point(mapping = aes(x=t, y=I)) + 
+     labs(x="Date",
+          y="Log Scale of New Cases") +
+     scale_y_log10(breaks=c(1, 10, 100, 1000, 10000),
+                   labels=NULL) +
+     geom_vline(xintercept = as.Date("2020-03-20"), linetype=4) +
+#     geom_label(label="Social Distancing Enforced",
+#                x=as.Date("2020-03-20"),
+#                y=0) +
+     geom_smooth(data = filter(nys, t <= as.Date("2020-03-20")), 
+                 mapping = aes(x=t, y=I),
+                 colour="red",
+                 method = lm,
+                 se=FALSE,
+                 fullrange=TRUE) +
+     geom_smooth(data = filter(nys, t >= as.Date("2020-03-20")), 
+                 mapping = aes(x=t, y=I),
+                 colour="green",
+                 method = lm,
+                 se=FALSE) +
+  facet_wrap(~county, ncol = 4)
+```
+
+#  Cummulative Cases by County
+```{r County Cummualtive, fig.height=30, fig.width=10}
+ggplot(data=nys) +
+     geom_point(mapping = aes(x=t, y=C)) + 
+     labs(x="Date",
+          y="Log Scale of Cumulative Cases") +
+        scale_y_log10(breaks=c(1, 10, 100, 1000, 10000))+
+     geom_vline(xintercept = as.Date("2020-03-20"), linetype=4) +
+#     geom_label(label="Social Distancing Enforced",
+#                x=as.Date("2020-03-20"),
+#                y=0) +
+     geom_smooth(data = filter(nys, t <= as.Date("2020-03-20")), 
+                 mapping = aes(x=t, y=C),
+                 colour="red",
+                 method = lm,
+                 se=FALSE,
+                 fullrange=TRUE) +
+     geom_smooth(data = filter(nys, t >= as.Date("2020-03-20")), 
+                 mapping = aes(x=t, y=C),
+                 colour="green",
+                 method = lm,
+                 se=FALSE) +
+  facet_wrap(~county, ncol = 4)
+```
+
+# Percentage of Tests performed that were Positive by County
+
+```{r County Percentage, fig.height=30, fig.width=10}
+ggplot(data=nys) + 
+     geom_point(mapping = 
+                        aes(x=t,
+                            y=I*100/(T)
+                            )) + 
+     labs(x="Date",
+          y="Percentage of Tests Performed that were Positive") +
+     geom_vline(xintercept = as.Date("2020-03-20"), linetype=4) +
+  geom_hline(yintercept=0) +
+#     geom_label(label="Social Distancing Enforced",
+#                x=as.Date("2020-03-20"),
+#                y=0) +
+        geom_smooth(mapping = aes(x=t, y=I*100/(T))) +
+  facet_wrap(~county, ncol = 4)
+```
+\pagebreak
+
+# Estimation of R in New York State by County
+
+```{r Counties R}
+NYcounties <- unique(nys$county)
+ny_map <- counties(state = 36)
+ROutput <- tibble(County=NYcounties, R=0, Std="")
+
+RInput <- function(co){
+     return(list(nys$I[nys$county == co])) 
+}
+df4 <- vapply(NYcounties, RInput, list(1))   ## produce a list of lists, each item is a list of daily incidence by County, labelled by County Name
+for(Incidence in names(df4)) {
+     R0 <- estimate_R(incid = df4[[Incidence]], 
+                      method = "parametric_si",
+                      config = list(mean_si = 3.96, 
+                                    std_si = 4.75))
+     n <- length(R0$R$t_start)
+     R <- round(R0$R$'Mean(R)'[n], 3)
+     std <- round(R0$R$'Std(R)'[n], 3)
+     ROutput$R[ROutput$County == Incidence] <- R
+     ROutput$Std[ROutput$County == Incidence] <- sprintf("(%.3f - %.3f)",R-1.96*std/sqrt(n),R+1.96*std/sqrt(n))
+}
+
+ny_map2 <- ny_map %>%
+        inner_join(ROutput, by = c("NAME"="County"))
+
+ROutput %>%
+  select(County, R, "95% Confidence Interval"=Std) %>%
+  arrange(desc(R)) %>%
+  kable()
+
+ggplot(data = ny_map2) +
+        geom_sf(aes(fill=R)) +
+        scale_fill_stepsn(breaks = c(0.5, 1, 1.2, 1.5, 2, 3), 
+                          colours = c("yellow", "green", "seagreen", "purple", "orange", "magenta", "red"))
+```
+\pagebreak
+
+<footer>
+  <h2 id="footnote-label">Footnotes</h2>
+  <ol>
+  <li id="R">American Journal of Epidemiology
+Vol. 178, No. 9 September 15, 2013
+A New Framework and Software to Estimate Time-Varying ReproductionNumbers During Epidemics
+  <a href="#R-ref" aria-label="Back to content">+</a>
+  </li>
+  <li id="SI">Emerging Infectious Disease
+Volume 26, Number 6—June 2020
+Research Letter
+Serial Interval of COVID-19 among Publicly Reported Confirmed Cases 
+  <a href="#SI-ref" aria-label="Back to content">+</a>
+  </li>
+  </ol>
+</footer>
