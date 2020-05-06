@@ -52,8 +52,7 @@ check_load_pkgs()
 options(tigris_class = "sf")
 options(tigris_use_cache = TRUE)
 
-#nys<-read.socrata("https://health.data.ny.gov/resource/xdss-u53e.json")
-nys<-data.table::fread("/home/ed/repos/COVID/nys_back")
+nys<-read.socrata("https://health.data.ny.gov/resource/xdss-u53e.json")
 ```
 
 ```{r initialize, include=FALSE}
@@ -146,7 +145,8 @@ ggplot(data=state) +
                 y=0) +
      labs(x="Date",
           y="Percentage of Tests Performed that were Positive") +
-     theme(axis.title.y.right = element_text(color = "tomato"),
+     theme(axis.title.y.left = element_text(color = "blue"),
+           axis.title.y.right = element_text(color = "tomato"),
            axis.text.y.right = element_text(color = "tomato"),
            panel.background = element_rect(fill = "white")) 
 ```
@@ -192,9 +192,6 @@ ggplot(data=nys) +
      scale_y_log10(breaks=c(1, 10, 100, 1000, 10000),
                    labels=NULL) +
      geom_vline(xintercept = as.Date("2020-03-20"), linetype=4) +
-#     geom_label(label="Social Distancing Enforced",
-#                x=as.Date("2020-03-20"),
-#                y=0) +
      geom_smooth(data = filter(nys, t <= as.Date("2020-03-20")), 
                  mapping = aes(x=t, y=I),
                  colour="red",
@@ -217,9 +214,6 @@ ggplot(data=nys) +
           y="Log Scale of Cumulative Cases") +
         scale_y_log10(breaks=c(1, 10, 100, 1000, 10000))+
      geom_vline(xintercept = as.Date("2020-03-20"), linetype=4) +
-#     geom_label(label="Social Distancing Enforced",
-#                x=as.Date("2020-03-20"),
-#                y=0) +
      geom_smooth(data = filter(nys, t <= as.Date("2020-03-20")), 
                  mapping = aes(x=t, y=C),
                  colour="red",
@@ -238,19 +232,26 @@ ggplot(data=nys) +
 
 ```{r County Percentage, fig.height=30, fig.width=10}
 ggplot(data=nys) + 
-     geom_point(mapping = 
+  geom_point(mapping = 
                         aes(x=t,
                             y=I*100/(T)
                             )) + 
-     labs(x="Date",
-          y="Percentage of Tests Performed that were Positive") +
-     geom_vline(xintercept = as.Date("2020-03-20"), linetype=4) +
+  labs(x="Date",
+       y="Percentage of Tests Performed that were Positive") +
+  geom_vline(xintercept = as.Date("2020-03-20"), linetype=4) +
   geom_hline(yintercept=0) +
-#     geom_label(label="Social Distancing Enforced",
-#                x=as.Date("2020-03-20"),
-#                y=0) +
-        geom_smooth(mapping = aes(x=t, y=I*100/(T))) +
-  facet_wrap(~county, ncol = 4)
+  geom_smooth(mapping = aes(x=t, y=I*100/(T))) + 
+  geom_ribbon(aes(ymin = 0,
+                  ymax = T/50,
+                  x=t),
+              alpha = 0.3,
+              fill = "tomato") +
+  scale_y_continuous(sec.axis = sec_axis(~.*50, name = "Total Tests Performed")) +
+  facet_wrap(~county, ncol = 4) + 
+  theme(axis.title.y.left = element_text(color = "blue"),
+        axis.title.y.right = element_text(color = "tomato"),
+        axis.text.y.right = element_text(color = "tomato"),
+        panel.background = element_rect(fill = "white"))   
 ```
 \pagebreak
 
