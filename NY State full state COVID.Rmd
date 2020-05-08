@@ -51,12 +51,16 @@ check_load_pkgs <- function() {
                 message("installing the 'usmap' package")
                 install.packages(usmap)
         }
+        if(!require(tidycensus)) {
+                message("installing the 'tidycensus' package")
+                install.packages(tidycensus)
+        }     
 }
 check_load_pkgs()
 options(tigris_class = "sf")
 options(tigris_use_cache = TRUE)
-
-nys<-read.socrata("https://health.data.ny.gov/resource/xdss-u53e.json")
+#nys<-read.socrata("https://health.data.ny.gov/resource/xdss-u53e.json")
+nys <- read_csv("/home/ed/repos/COVID/nys_back")
 ```
 
 ```{r initialize, include=FALSE}
@@ -74,23 +78,30 @@ state <- nys %>%
   summarise(S=sum(I))
 ggplot(data=state) +
      geom_point(mapping = aes(x=t, y=S)) + 
+     geom_label_repel(data = filter(state, t == max(t)), 
+                      aes(x=t, 
+                          y=S,
+                          label=sprintf("%i", S)),
+                      segment.color = "black",
+                      nudge_x = -10,
+                      nudge_y = 50) +
      labs(x="Date",
-          y="Log Scale of New Cases") +
-     scale_y_log10(breaks=c(1, 10, 100, 1000, 10000)) +
+          y="New Cases per Day") +
+#     scale_y_log10(breaks=c(1, 10, 100, 1000, 10000)) +
      geom_vline(xintercept = as.Date("2020-03-20"), linetype=4) +
      geom_label(label="Social Distancing Enforced",
                 x=as.Date("2020-03-20"),
-                y=0) +
-     geom_smooth(data = filter(state, t <= as.Date("2020-03-20")), 
-                 mapping = aes(x=t, y=S),
-                 colour="red",
-                 method = lm,
-                 se=FALSE,
-                 fullrange=TRUE) +
-     geom_smooth(data = filter(state, t >= as.Date("2020-03-20")), 
-                 mapping = aes(x=t, y=S),
-                 colour="green",
-                 se=FALSE)
+                y=0) 
+#     geom_smooth(data = filter(state, t <= as.Date("2020-03-20")), 
+#                 mapping = aes(x=t, y=S),
+#                 colour="red",
+#                 method = lm,
+#                 se=FALSE,
+#                 fullrange=TRUE) +
+#     geom_smooth(data = filter(state, t >= as.Date("2020-03-20")), 
+#                 mapping = aes(x=t, y=S),
+#                 colour="green",
+#                 se=FALSE)
 ```
 
 \pagebreak
@@ -103,6 +114,13 @@ state <- nys %>%
   summarise(S=sum(C))
 ggplot(data=state) +
      geom_point(mapping = aes(x=t, y=S)) + 
+     geom_label_repel(data = filter(state, t == max(t)), 
+                      aes(x=t, 
+                          y=S,
+                          label=sprintf("%i", S)),
+                      segment.color = "black",
+                      nudge_x = -10,
+                      nudge_y = 2) +
      labs(x="Date",
           y="Log Scale of Cummulative Cases") +
      scale_y_log10(breaks=c(1, 10, 100, 1000, 10000)) +
@@ -141,8 +159,8 @@ ggplot(data=state) +
                           y=I1*100/T1,
                           label=sprintf("%.2f %%", I1*100/T1)),
                       segment.color = "black",
-                      nudge_x = -3,
-                      nudge_y = -10) +
+                      nudge_x = -20,
+                      nudge_y = 50) +
      geom_ribbon(aes(ymin = 0,
                      ymax = T1/500,
                      x=t),
@@ -199,21 +217,28 @@ hist(R.sample)
 ggplot(data=nys) +
      geom_point(mapping = aes(x=t, y=I)) + 
      labs(x="Date",
-          y="Log Scale of New Cases") +
-     scale_y_log10(breaks=c(1, 10, 100, 1000, 10000),
-                   labels=NULL) +
+          y="New Cases per Day") +
+#     scale_y_log10(breaks=c(1, 10, 100, 1000, 10000),
+#                   labels=NULL) +
      geom_vline(xintercept = as.Date("2020-03-20"), linetype=4) +
-     geom_smooth(data = filter(nys, t <= as.Date("2020-03-20")), 
-                 mapping = aes(x=t, y=I),
-                 colour="red",
-                 method = lm,
-                 se=FALSE,
-                 fullrange=TRUE) +
-     geom_smooth(data = filter(nys, t >= as.Date("2020-03-20")), 
-                 mapping = aes(x=t, y=I),
-                 colour="green",
-                 method = lm,
-                 se=FALSE) +
+#     geom_smooth(data = filter(nys, t <= as.Date("2020-03-20")), 
+#                 mapping = aes(x=t, y=I),
+#                 colour="red",
+#                 method = lm,
+#                 se=FALSE,
+#                fullrange=TRUE) +
+#     geom_smooth(data = filter(nys, t >= as.Date("2020-03-20")), 
+#                 mapping = aes(x=t, y=I),
+#                 colour="green",
+#                 method = lm,
+#                 se=FALSE) +
+     geom_label_repel(data = filter(nys, t == max(t)), 
+                      aes(x=t, 
+                          y=I,
+                          label=sprintf("%i", I)),
+                      segment.color = "black",
+                      nudge_x = -20,
+                      nudge_y = 100) +     
   facet_wrap(~county, ncol = 4) + 
   theme(panel.background = element_rect(fill = "white")) 
 ```
@@ -222,9 +247,16 @@ ggplot(data=nys) +
 ```{r County Cummualtive, fig.height=30, fig.width=10}
 ggplot(data=nys) +
      geom_point(mapping = aes(x=t, y=C)) + 
+     geom_label_repel(data = filter(nys, t == max(t)), 
+                      aes(x=t, 
+                          y=C,
+                          label=sprintf("%i", C)),
+                      segment.color = "black",
+                      nudge_x = -20,
+                      nudge_y = -4) +
      labs(x="Date",
           y="Log Scale of Cumulative Cases") +
-        scale_y_log10(breaks=c(1, 10, 100, 1000, 10000))+
+     scale_y_log10(breaks=c(1, 10, 100, 1000, 10000))+
      geom_vline(xintercept = as.Date("2020-03-20"), linetype=4) +
      geom_smooth(data = filter(nys, t <= as.Date("2020-03-20")), 
                  mapping = aes(x=t, y=C),
@@ -245,34 +277,39 @@ ggplot(data=nys) +
 
 ```{r County Percentage, fig.height=30, fig.width=10}
 ggplot(data=nys) + 
-  geom_point(mapping = 
-                        aes(x=t,
-                            y=I*100/(T)
-                            )) + 
-  labs(x="Date",
-       y="Percentage of Tests Performed that were Positive") +
-  geom_vline(xintercept = as.Date("2020-03-20"), linetype=4) +
-  geom_hline(yintercept=0) +
-  geom_smooth(mapping = aes(x=t, y=I*100/(T))) + 
-  geom_ribbon(aes(ymin = 0,
-                  ymax = T/50,
-                  x=t),
-              alpha = 0.3,
-              fill = "tomato") +
-  scale_y_continuous(sec.axis = sec_axis(~.*50, name = "Total Tests Performed")) +
-  facet_wrap(~county, ncol = 4) + 
-  theme(axis.title.y.left = element_text(color = "blue"),
-        axis.title.y.right = element_text(color = "tomato"),
-        axis.text.y.right = element_text(color = "tomato"),
-        panel.background = element_rect(fill = "white"))   
+     geom_point(mapping = aes(x=t, y=I*100/T)) + 
+     geom_smooth(mapping = aes(x=t, y=I*100/T)) +
+     geom_label_repel(data = filter(nys, t == max(t)), 
+                      aes(x=t, 
+                          y=I*100/T,
+                          label=sprintf("%.2f %%", I*100/T)),
+                      segment.color = "black",
+                      nudge_x = -20,
+                      nudge_y = 50) +
+     geom_ribbon(aes(ymin = 0,
+                     ymax = T/60,
+                     x=t),
+                 alpha = 0.3,
+                 fill = "tomato") +
+     scale_y_continuous(sec.axis = sec_axis(~.*60, name = "Total Tests Performed")) +
+     geom_vline(xintercept = as.Date("2020-03-20"), linetype=4) +
+     geom_hline(yintercept = 0) +
+     labs(x="Date",
+          y="Percentage of Tests Performed that were Positive") +
+     facet_wrap(~county, ncol=4) +
+     theme(panel.background = element_rect(fill = "white")) 
 ```
 \pagebreak
 
 # Estimation of R in New York State by County
 
+Counties with fewer than 11 cases per week, on average, do not have enough data to accurately estimate R.  For those counties, R and the 95% Confidence Interval are listed as 0.  On the map, they are colored grey.
+
 ```{r Counties R}
 NYcounties <- unique(nys$county)
 ny_map <- counties(state = 36)
+NYpop <- get_acs(geography = "county", state="NY", variables = "B01003_001") %>%
+        select(GEOID, estimate)
 ROutput <- tibble(County=NYcounties, R=0, Std="")
 
 RInput <- function(co){
@@ -280,29 +317,59 @@ RInput <- function(co){
 }
 df4 <- vapply(NYcounties, RInput, list(1))   ## produce a list of lists, each item is a list of daily incidence by County, labelled by County Name
 for(Incidence in names(df4)) {
-     R0 <- estimate_R(incid = df4[[Incidence]], 
-                      method = "parametric_si",
-                      config = list(mean_si = 3.96, 
-                                    std_si = 4.75))
-     n <- length(R0$R$t_start)
-     R <- round(R0$R$'Mean(R)'[n], 3)
-     std <- round(R0$R$'Std(R)'[n], 3)
-     ROutput$R[ROutput$County == Incidence] <- R
-     ROutput$Std[ROutput$County == Incidence] <- sprintf("(%.3f - %.3f)",R-1.96*std/sqrt(n),R+1.96*std/sqrt(n))
+     if(sum(df4[[Incidence]])*7/length(df4[[Incidence]])>11) {
+          R0 <- estimate_R(incid = df4[[Incidence]], 
+                           method = "parametric_si",
+                           config = list(mean_si = 3.96, 
+                                         std_si = 4.75))
+          n <- length(R0$R$t_start)
+          std <- round(R0$R$'Std(R)'[n], 3)
+          R <- round(R0$R$'Mean(R)'[n], 3)
+          ROutput$R[ROutput$County == Incidence] <- R
+          ROutput$Std[ROutput$County == Incidence] <- sprintf("(%.3f - %.3f)",R-1.96*std/sqrt(n),R+1.96*std/sqrt(n))
+     } else {
+          ROutput$R[ROutput$County == Incidence] <- 0
+          ROutput$Std[ROutput$County == Incidence] <- 0
+     }
 }
 
-ny_map2 <- ny_map %>%
-        inner_join(ROutput, by = c("NAME"="County"))
+ny_map2 <- cbind(ny_map, st_coordinates(st_centroid(ny_map$geometry))) %>% 
+        select(GEOID, County = NAME, X, Y) %>%
+        mutate(LabelDirection = if_else(X+75>0,"A","B"))
+ny_map3 <- ny_map2 %>%
+        inner_join(ROutput, by = "County") %>%
+        inner_join(NYpop, by = "GEOID") 
 
-ROutput %>%
-  select(County, R, "95% Confidence Interval"=Std) %>%
-  arrange(desc(R)) %>%
-  kable()
+ny_map3 %>%
+        as_tibble() %>%
+        select(County, R, "95% Confidence Interval"=Std, "Population"=estimate) %>%
+        arrange(desc(R)) %>%
+        kable()
 
-ggplot(data = ny_map2) +
+ggplot(data=ny_map3) +
         geom_sf(aes(fill=R)) +
-        scale_fill_stepsn(breaks = c(0.5, 1, 1.2, 1.5, 2, 3), 
-                          colours = c("yellow", "green", "seagreen", "purple", "orange", "magenta", "red"))
+        scale_fill_stepsn(breaks = c(.1, 0.5, 1, 1.2, 1.5, 2), 
+                          colours = c("grey", "yellow", "green",  "seagreen", "orange", "magenta", "red")) + 
+       geom_label_repel(data=filter(ny_map3, R>0, LabelDirection=="A"), 
+                        mapping=aes(X, Y, label=County),
+                        force = 1,
+                        direction="y",
+                        hjust = 0,
+                        nudge_x = 5,
+                        size=1.5) +
+        geom_label_repel(data=filter(ny_map3, R>0, LabelDirection=="B"), 
+                         mapping=aes(X, Y, label=County),
+                         force = 10,
+                         direction = "y",
+                         hjust = 1,
+                         nudge_x = -5,
+                         size=1.5) +
+        ylim(40,46)+
+        theme(panel.background = element_rect(fill = "white"),
+              axis.title = element_blank(),
+              axis.text = element_blank(),
+              axis.ticks = element_blank())     
+
 ```
 \pagebreak
 
