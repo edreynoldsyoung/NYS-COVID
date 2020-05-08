@@ -54,12 +54,17 @@ check_load_pkgs <- function() {
         if(!require(tidycensus)) {
                 message("installing the 'tidycensus' package")
                 install.packages(tidycensus)
+        }
+        if(!require(ggplotify)) {
+                message("installing the 'ggplotify' package")
+                install.packages(ggplotify)
         }     
 }
 check_load_pkgs()
 options(tigris_class = "sf")
 options(tigris_use_cache = TRUE)
-nys<-read.socrata("https://health.data.ny.gov/resource/xdss-u53e.json")
+#nys<-read.socrata("https://health.data.ny.gov/resource/xdss-u53e.json")
+nys <- data.table::fread("/home/ed/repos/COVID/nys_back")
 ```
 
 ```{r initialize, include=FALSE}
@@ -72,35 +77,31 @@ nys<-nys %>%
 
 # New York State New Cases
 ```{r NYS New}
-state <- nys %>% 
-  group_by(t) %>% 
-  summarise(S=sum(I))
-ggplot(data=state) +
-     geom_point(mapping = aes(x=t, y=S)) + 
-     geom_label_repel(data = filter(state, t == max(t)), 
-                      aes(x=t, 
-                          y=S,
-                          label=sprintf("%i", S)),
-                      segment.color = "black",
-                      nudge_x = -10,
-                      nudge_y = 50) +
-     labs(x="Date",
-          y="New Cases per Day") +
-#     scale_y_log10(breaks=c(1, 10, 100, 1000, 10000)) +
-     geom_vline(xintercept = as.Date("2020-03-20"), linetype=4) +
-     geom_label(label="Social Distancing Enforced",
-                x=as.Date("2020-03-20"),
-                y=0) 
-#     geom_smooth(data = filter(state, t <= as.Date("2020-03-20")), 
-#                 mapping = aes(x=t, y=S),
-#                 colour="red",
-#                 method = lm,
-#                 se=FALSE,
-#                 fullrange=TRUE) +
-#     geom_smooth(data = filter(state, t >= as.Date("2020-03-20")), 
-#                 mapping = aes(x=t, y=S),
-#                 colour="green",
-#                 se=FALSE)
+state <- nys %>%
+     group_by(t) %>%
+     summarise(S = sum(I))
+ggplot(data = state) +
+     geom_point(mapping = aes(x = t, y = S)) +
+     geom_label_repel(
+          data = filter(state, t == max(t)),
+          aes(
+               x = t,
+               y = S,
+               label = sprintf("%i", S)
+          ),
+          segment.color = "black",
+          nudge_x = -10,
+          nudge_y = 50
+     ) +
+     labs(x = "Date",
+          y = "New Cases per Day") +
+     geom_vline(xintercept = as.Date("2020-03-20"), linetype = 4) +
+     geom_label(label = "Social Distancing Enforced",
+                x = as.Date("2020-03-20"),
+                y = 0) +
+     theme(plot.background = element_rect(fill = "linen"),
+           panel.background = element_rect(fill = "linen"),
+           axis.line = element_line(color="black"))
 ```
 
 \pagebreak
@@ -136,7 +137,10 @@ ggplot(data=state) +
      geom_smooth(data = filter(state, t >= as.Date("2020-03-20")), 
                  mapping = aes(x=t, y=S),
                  colour="green",
-                 se=FALSE)
+                 se=FALSE) +
+     theme(plot.background = element_rect(fill = "linen"),
+           panel.background = element_rect(fill = "linen"),
+           axis.line = element_line(color="black"))
 ```
 
 \pagebreak
@@ -167,7 +171,6 @@ ggplot(data=state) +
                  fill = "tomato") +
      scale_y_continuous(sec.axis = sec_axis(~.*500, name = "Total Tests Performed")) +
      geom_vline(xintercept = as.Date("2020-03-20"), linetype=4) +
-     geom_hline(yintercept = 0) +
      geom_label(label="Social Distancing Enforced",
                 x=as.Date("2020-03-20"),
                 y=0) +
@@ -176,7 +179,11 @@ ggplot(data=state) +
      theme(axis.title.y.left = element_text(color = "blue"),
            axis.title.y.right = element_text(color = "tomato"),
            axis.text.y.right = element_text(color = "tomato"),
-           panel.background = element_rect(fill = "white")) 
+           panel.background = element_rect(fill = "linen"),
+           plot.background = element_rect(fill = "linen"),
+           axis.line.x = element_line(color="black"),
+           axis.line.y.left = element_line(color="black"),
+           axis.line.y.right = element_line(color="tomato")) 
 ```
 
 \pagebreak
@@ -217,29 +224,20 @@ ggplot(data=nys) +
      geom_point(mapping = aes(x=t, y=I)) + 
      labs(x="Date",
           y="New Cases per Day") +
-#     scale_y_log10(breaks=c(1, 10, 100, 1000, 10000),
-#                   labels=NULL) +
      geom_vline(xintercept = as.Date("2020-03-20"), linetype=4) +
-#     geom_smooth(data = filter(nys, t <= as.Date("2020-03-20")), 
-#                 mapping = aes(x=t, y=I),
-#                 colour="red",
-#                 method = lm,
-#                 se=FALSE,
-#                fullrange=TRUE) +
-#     geom_smooth(data = filter(nys, t >= as.Date("2020-03-20")), 
-#                 mapping = aes(x=t, y=I),
-#                 colour="green",
-#                 method = lm,
-#                 se=FALSE) +
      geom_label_repel(data = filter(nys, t == max(t)), 
                       aes(x=t, 
                           y=I,
                           label=sprintf("%i", I)),
                       segment.color = "black",
                       nudge_x = -10,
-                      nudge_y = 300) +     
+                      nudge_y = 500) +     
   facet_wrap(~county, ncol = 4) + 
-  theme(panel.background = element_rect(fill = "white")) 
+  theme(plot.background = element_rect(fill = "linen"),
+        panel.background = element_rect(fill = "linen"),
+        strip.background = element_rect(fill="grey80"),
+        strip.text = element_text(color="black"),
+        panel.border = element_rect(colour = "black", fill=NA, size=1))
 ```
 
 #  Cummulative Cases by County
@@ -269,34 +267,54 @@ ggplot(data=nys) +
                  method = lm,
                  se=FALSE) +
   facet_wrap(~county, ncol = 4) + 
-  theme(panel.background = element_rect(fill = "white")) 
+  theme(plot.background = element_rect(fill = "linen"),
+        panel.background = element_rect(fill = "linen"),
+        strip.background = element_rect(fill="grey80"),
+        strip.text = element_text(color="black"),
+        panel.border = element_rect(colour = "black", fill=NA, size=1))
 ```
 
 # Percentage of Tests performed that were Positive by County
 
 ```{r County Percentage, fig.height=30, fig.width=20}
-ggplot(data=nys) + 
-     geom_point(mapping = aes(x=t, y=I*100/T)) + 
-     geom_smooth(mapping = aes(x=t, y=I*100/T)) +
-     geom_label_repel(data = filter(nys, t == max(t)), 
-                      aes(x=t, 
-                          y=I*100/T,
-                          label=sprintf("%.2f %%", I*100/T)),
-                      segment.color = "black",
-                      nudge_x = -10,
-                      nudge_y = 50) +
+ggplot(data = nys) +
+     geom_point(mapping = aes(x = t, y = I * 100 / T)) +
+     geom_smooth(mapping = aes(x = t, y = I * 100 / T)) +
+     geom_label_repel(
+          data = filter(nys, t == max(t)),
+          aes(
+               x = t,
+               y = I * 100 / T,
+               label = sprintf("%.2f %%", I * 100 / T)
+          ),
+          segment.color = "black",
+          nudge_x = -10,
+          nudge_y = 50
+     ) +
      geom_ribbon(aes(ymin = 0,
-                     ymax = T/60,
-                     x=t),
+                     ymax = T / 60,
+                     x = t),
                  alpha = 0.3,
                  fill = "tomato") +
-     scale_y_continuous(sec.axis = sec_axis(~.*60, name = "Total Tests Performed")) +
-     geom_vline(xintercept = as.Date("2020-03-20"), linetype=4) +
+     scale_y_continuous(sec.axis = sec_axis( ~ . * 60, name = "Total Tests Performed")) +
+     geom_vline(xintercept = as.Date("2020-03-20"), linetype = 4) +
      geom_hline(yintercept = 0) +
-     labs(x="Date",
-          y="Percentage of Tests Performed that were Positive") +
-     facet_wrap(~county, ncol=4) +
-     theme(panel.background = element_rect(fill = "white")) 
+     labs(x = "Date",
+          y = "Percentage of Tests Performed that were Positive") +
+     facet_wrap( ~ county, ncol = 4) +
+     theme(
+          plot.background = element_rect(fill = "linen"),
+          panel.background = element_rect(fill = "linen"),
+          strip.background = element_rect(fill = "grey80"),
+          strip.text = element_text(color = "black"),
+          axis.text.y.right = element_text(color="tomato"),
+          axis.title.y.right = element_text(color="tomato"),
+          panel.border = element_rect(
+               colour = "black",
+               fill = NA,
+               size = 1
+          )
+     )
 ```
 \pagebreak
 
@@ -304,7 +322,7 @@ ggplot(data=nys) +
 
 Counties with fewer than 11 cases per week, on average, do not have enough data to accurately estimate R.  For those counties, R and the 95% Confidence Interval are listed as 0.  On the map, they are colored grey.
 
-```{r Counties R}
+```{r Counties R, fig.width=20, fig.height=20}
 NYcounties <- unique(nys$county)
 ny_map <- counties(state = 36)
 NYpop <- get_acs(geography = "county", state="NY", variables = "B01003_001") %>%
@@ -349,26 +367,20 @@ ggplot(data=ny_map3) +
         geom_sf(aes(fill=R)) +
         scale_fill_stepsn(breaks = c(.1, 0.5, 1, 1.2, 1.5, 2), 
                           colours = c("grey", "yellow", "green",  "seagreen", "orange", "magenta", "red")) + 
-       geom_label_repel(data=filter(ny_map3, R>0, LabelDirection=="A"), 
+       geom_text_repel(data=filter(ny_map3, R>0, LabelDirection=="A"), 
                         mapping=aes(X, Y, label=County),
-                        force = 1,
-                        direction="y",
-                        hjust = 0,
-                        nudge_x = 5,
-                        size=1.5) +
-        geom_label_repel(data=filter(ny_map3, R>0, LabelDirection=="B"), 
+                        size=4) +
+        geom_text_repel(data=filter(ny_map3, R>0, LabelDirection=="B"), 
                          mapping=aes(X, Y, label=County),
-                         force = 10,
-                         direction = "y",
-                         hjust = 1,
-                         nudge_x = -5,
-                         size=1.5) +
+                         size=4) +
         ylim(40,46)+
-        theme(panel.background = element_rect(fill = "white"),
+        theme(panel.background = element_rect(fill = "linen"),
+              rect = element_rect(fill = "linen"),
+              plot.background = element_rect(fill = "linen"),
+              legend.background = element_rect(fill = "linen"),  
               axis.title = element_blank(),
               axis.text = element_blank(),
               axis.ticks = element_blank())     
-
 ```
 \pagebreak
 
