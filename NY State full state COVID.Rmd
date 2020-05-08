@@ -3,11 +3,11 @@ title: 'New York State COVID-19'
 author: "Ed Young"
 date: "April 7, 2020"
 output:
+  pdf_document: default
   html_document:
     css: styles.css
     highlight: null
     theme: null
-  pdf_document: default
   word_document: default
   df_print: kable
 ---
@@ -212,7 +212,7 @@ hist(R.sample)
 
 # Number of New Cases by County
 
-```{r County New, fig.height=30, fig.width=10}
+```{r County New,  fig.height=30, fig.width=20}
 ggplot(data=nys) +
      geom_point(mapping = aes(x=t, y=I)) + 
      labs(x="Date",
@@ -243,7 +243,7 @@ ggplot(data=nys) +
 ```
 
 #  Cummulative Cases by County
-```{r County Cummualtive, fig.height=30, fig.width=10}
+```{r County Cummualtive, fig.height=30, fig.width=20}
 ggplot(data=nys) +
      geom_point(mapping = aes(x=t, y=C)) + 
      geom_label_repel(data = filter(nys, t == max(t)), 
@@ -274,7 +274,7 @@ ggplot(data=nys) +
 
 # Percentage of Tests performed that were Positive by County
 
-```{r County Percentage, fig.height=30, fig.width=10}
+```{r County Percentage, fig.height=30, fig.width=20}
 ggplot(data=nys) + 
      geom_point(mapping = aes(x=t, y=I*100/T)) + 
      geom_smooth(mapping = aes(x=t, y=I*100/T)) +
