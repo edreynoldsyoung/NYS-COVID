@@ -55,16 +55,11 @@ check_load_pkgs <- function() {
                 message("installing the 'tidycensus' package")
                 install.packages(tidycensus)
         }
-        if(!require(ggplotify)) {
-                message("installing the 'ggplotify' package")
-                install.packages(ggplotify)
-        }     
 }
 check_load_pkgs()
 options(tigris_class = "sf")
 options(tigris_use_cache = TRUE)
-#nys<-read.socrata("https://health.data.ny.gov/resource/xdss-u53e.json")
-nys <- data.table::fread("/home/ed/repos/COVID/nys_back")
+nys<-read.socrata("https://health.data.ny.gov/resource/xdss-u53e.json")
 ```
 
 ```{r initialize, include=FALSE}
