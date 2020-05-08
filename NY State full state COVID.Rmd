@@ -3,11 +3,11 @@ title: 'New York State COVID-19'
 author: "Ed Young"
 date: "April 7, 2020"
 output:
-  pdf_document: default
   html_document:
     css: styles.css
     highlight: null
     theme: null
+  pdf_document: default
   word_document: default
   df_print: kable
 ---
