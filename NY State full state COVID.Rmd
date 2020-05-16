@@ -61,6 +61,9 @@ check_load_pkgs <- function() {
 check_load_pkgs()
 options(tigris_class = "sf")
 options(tigris_use_cache = TRUE)
+## Download latest NY State data from health.data.ny.gov
+## Munge
+
 nys <-
      read.socrata("https://health.data.ny.gov/resource/xdss-u53e.json") %>%
      select(t = test_date,
@@ -75,6 +78,26 @@ nys <-
           T = as.integer(T)
      ) %>%
      map_df(rev)
+state <- nys %>%
+     group_by(t) %>%
+     summarise(SI = sum(I),
+               SC = sum(C),
+               ST = sum(T))
+
+## Calculate Rt using the EpiEstim Package
+## The window for estimating Rt can be adjusted using t_start and t_end.
+## The default setting for the window is 7 days
+
+t_start <- seq(2, nrow(state) - 3)
+t_end <- seq(5, nrow(state))
+R.instantaneous <- estimate_R(state$SI,
+                              method = "parametric_si",
+                              config = list(mean_si = 3.96,
+                                            std_si = 4.75))
+
+## Download data on deaths from NY Times
+## Munge
+
 NYdeaths <-
      read.csv(
           "https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv",
@@ -88,7 +111,33 @@ NYdeaths <-
      ) %>%
      filter(state == "New York") %>%
      as_tibble()
+stateDeaths <- NYdeaths %>%
+     select(date, deaths) %>%
+     group_by(date) %>%
+     summarise(SD = sum(deaths)) %>%
+     mutate(d = SD - lag(SD, n = 1, default = 0))
+NYdeaths1 <- NYdeaths %>%
+     select(county, date, deaths) %>%
+     group_by(county) %>%
+     arrange(county, date) %>%
+     mutate(d = deaths - dplyr::lag(deaths, n = 1, default = 0)) %>%
+     ungroup()
+NYdeaths2 <- NYdeaths1 %>%
+     group_by(county) %>%
+     filter(max(d) > 100 & county != "Unknown")
+NYdeaths3 <- NYdeaths1 %>%
+     group_by(county) %>%
+     filter(max(d) > 10 & max(d) <= 100)
+NYdeaths4 <- NYdeaths1 %>%
+     group_by(county) %>%
+     filter(max(d) <= 10)
+
+## Download map data
 ny_map <- counties(state = 36)
+
+## Download census data
+## Munge
+
 NYpop <-
      get_acs(geography = "county",
              state = "NY",
@@ -96,23 +145,80 @@ NYpop <-
 NYpop$NAME <-
      str_replace(NYpop$NAME, "(.*) County, New York", "\\1")
 NYpop <- NYpop %>% select(GEOID, county = NAME, estimate)
+
+## Setup for estimating Rt
+
+NYcounties <- unique(nys$county)
+ROutput <- tibble(County = NYcounties, R = 0, Std = "")
+
+RInput <- function(co) {
+     return(list(nys$I[nys$county == co]))
+}
+
+## produce a list of lists,
+## each item is a list of daily incidence by County, labelled by County Name
+
+df4 <- vapply(NYcounties, RInput, list(1))
+
+## Iterate over the list of incidences by county,
+## Use the estimate_R function to estimate R and it's std for each county
+## Assign those values to the ROutput data.frame
+
+for (Incidence in names(df4)) {
+     if (sum(df4[[Incidence]]) * 7 / length(df4[[Incidence]]) > 11) {
+          R0 <- estimate_R(
+               incid = df4[[Incidence]],
+               method = "parametric_si",
+               config = list(mean_si = 3.96,
+                             std_si = 4.75)
+          )
+          n <- length(R0$R$t_start)
+          std <- round(R0$R$'Std(R)'[n], 3)
+          R <- round(R0$R$'Mean(R)'[n], 3)
+          ROutput$R[ROutput$County == Incidence] <- R
+          ROutput$Std[ROutput$County == Incidence] <-
+               sprintf("(%.3f - %.3f)",
+                       R - 1.96 * std / sqrt(n),
+                       R + 1.96 * std / sqrt(n))
+     } else {
+          ROutput$R[ROutput$County == Incidence] <- NA
+          ROutput$Std[ROutput$County == Incidence] <- NA
+     }
+}
+
+# Joining data from Map, Census, and Rt estimation
+
+ny_map2 <-
+     cbind(ny_map, st_coordinates(st_centroid(ny_map$geometry))) %>%
+     select(GEOID, County = NAME, X, Y) %>%
+     mutate(LabelDirection = if_else(X + 75 > 0, "A", "B"))
+ny_map3 <- ny_map2 %>%
+     inner_join(ROutput, by = "County") %>%
+     inner_join(NYpop, by = "GEOID") 
+
+ny_map4 <- ny_map3 %>%
+     as_tibble() %>%
+     arrange(desc(R)) %>%
+     select(
+          County,
+          "R<sub>t</sub>" = R,
+          "95% Confidence Interval" = Std,
+          "Population" = estimate
+     )
 ```
 
 ## This page is based on <a aria-describedby="footnote-label" href="#D">data</a> from New York State Department of Health, most recently updated on `r max(nys$t)`.
 
 # New York State New Cases
 ```{r NYS New}
-state <- nys %>%
-     group_by(t) %>%
-     summarise(S = sum(I))
 ggplot(data = state) +
-     geom_point(mapping = aes(x = t, y = S)) +
+     geom_point(mapping = aes(x = t, y = SI)) +
      geom_label_repel(
           data = filter(state, t == max(t)),
           aes(
                x = t,
-               y = S,
-               label = sprintf("%i", S)
+               y = SI,
+               label = sprintf("%i", SI)
           ),
           segment.color = "black",
           nudge_x = -10,
@@ -123,7 +229,7 @@ ggplot(data = state) +
      geom_vline(xintercept = as.Date("2020-03-20"), linetype = 4) +
      geom_label(label = "Social Distancing Enforced",
                 x = as.Date("2020-03-20"),
-                y = max(state$S)) +
+                y = max(state$SI)) +
      theme(
           plot.background = element_rect(fill = "linen"),
           panel.background = element_rect(fill = "linen"),
@@ -132,13 +238,13 @@ ggplot(data = state) +
      ggtitle(label = "New Cases - Natural Scale")
 
 ggplot(data = state) +
-     geom_point(mapping = aes(x = t, y = S)) +
+     geom_point(mapping = aes(x = t, y = SI)) +
      geom_label_repel(
           data = filter(state, t == max(t)),
           aes(
                x = t,
-               y = S,
-               label = sprintf("%i", S)
+               y = SI,
+               label = sprintf("%i", SI)
           ),
           segment.color = "black",
           nudge_x = -10,
@@ -164,17 +270,14 @@ ggplot(data = state) +
 # New York State Cummulative Cases
 
 ```{r NYS Cummulative}
-state <- nys %>%
-     group_by(t) %>%
-     summarise(S = sum(C))
 ggplot(data = state) +
-     geom_point(mapping = aes(x = t, y = S)) +
+     geom_point(mapping = aes(x = t, y = SC)) +
      geom_label_repel(
           data = filter(state, t == max(t)),
           aes(
                x = t,
-               y = S,
-               label = sprintf("%i", S)
+               y = SC,
+               label = sprintf("%i", SC)
           ),
           segment.color = "black",
           nudge_x = -10,
@@ -189,14 +292,14 @@ ggplot(data = state) +
                 y = 1) +
      geom_smooth(
           data = filter(state, t <= as.Date("2020-03-20")),
-          mapping = aes(x = t, y = S),
+          mapping = aes(x = t, y = SC),
           colour = "red",
           method = lm,
           se = FALSE
      ) +
      geom_smooth(
           data = filter(state, t >= as.Date("2020-03-20")),
-          mapping = aes(x = t, y = S),
+          mapping = aes(x = t, y = SC),
           colour = "green",
           se = FALSE
      ) +
@@ -214,19 +317,15 @@ ggplot(data = state) +
 The raw number of positive tests per day can vary depending on how many tests were performed on that day.  One way to normalize this variation is to look at the percentage of tests performed that were positive rather than the raw number of positive tests.
 
 ```{r NYS Percentage}
-state <- nys %>%
-     group_by(t) %>%
-     summarise(I1 = sum(I),
-               T1 = sum(T))
 ggplot(data = state) +
-     geom_point(mapping = aes(x = t, y = I1 * 100 / T1)) +
-     geom_smooth(mapping = aes(x = t, y = I1 * 100 / T1)) +
+     geom_point(mapping = aes(x = t, y = SI * 100 / ST)) +
+     geom_smooth(mapping = aes(x = t, y = SI * 100 / ST)) +
      geom_label_repel(
           data = filter(state, t == max(t)),
           aes(
                x = t,
-               y = I1 * 100 / T1,
-               label = sprintf("%.1f %%", I1 * 100 / T1)
+               y = SI * 100 / ST,
+               label = sprintf("%.1f %%", SI * 100 / ST)
           ),
           segment.color = "black",
           nudge_x = -20,
@@ -234,9 +333,9 @@ ggplot(data = state) +
      ) +
      geom_ribbon(aes(
           ymin = 0,
-          ymax = T1 / 500,
+          ymax = ST / 500,
           x = t,
-          fill = T1
+          fill = ST
      ),
      alpha = 0.3,
      fill = "tomato") +
@@ -263,16 +362,10 @@ ggplot(data = state) +
 # Deaths in New York State
 
 ```{r NYS Deaths}
-state <- NYdeaths %>%
-     select(date, deaths) %>%
-     group_by(date) %>%
-     summarise(S = sum(deaths)) %>%
-     mutate(d = S - lag(S, n = 1, default = 0))
-
-ggplot(data = state) +
+ggplot(data = stateDeaths) +
      geom_point(mapping = aes(x = date, y = d)) +
      geom_label_repel(
-          data = filter(state, date == max(date)),
+          data = filter(stateDeaths, date == max(date)),
           aes(
                x = date,
                y = d,
@@ -292,15 +385,15 @@ ggplot(data = state) +
           axis.line = element_line(color = "black")
      ) +
      ggtitle(label = "Deaths per Day - Natural Scale")
-ggplot(data = state) +
-     geom_point(mapping = aes(x = date, y = S)) +
+ggplot(data = stateDeaths) +
+     geom_point(mapping = aes(x = date, y = SD)) +
      scale_y_log10() +
      geom_label_repel(
-          data = filter(state, date == max(date)),
+          data = filter(stateDeaths, date == max(date)),
           aes(
                x = date,
-               y = S,
-               label = sprintf("%i", S)
+               y = SD,
+               label = sprintf("%i", SD)
           ),
           segment.color = "black",
           nudge_x = -10,
@@ -319,18 +412,6 @@ ggplot(data = state) +
 # Estimation of R~t~ in New York State as a whole
 
 Transmissibility of a virus during an epidemic can be measured by the reproduction number R<sub>t</sub>, the average number of secondary infections caused by a primary infected <a aria-describedby="footnote-label" href="#R"> individual</a>.  Statistical methods to estimate R<sub>t</sub> have been developed which require only case incidence data and the distribution of the serial interval (the time between the onset of symptoms in the primary case and the onset of symptoms in the secondary cases). The distribution of the serial interval (mean and standard deviation) can be estimated by directly interviewing people who have been <a aria-describedby="footnote-label" href="#SI">infected</a>.  So long as some new infections continue to occur R<sub>t</sub> will be greater than 0.  If R<sub>t</sub> is less than 1 (each infected individual causes less than one other person to become infected, on average), we would expect the number of new cases each day to be less than the day before.  If R<sub>t</sub> is greater than 1, we would expect the number of new cases to grow.  
-
-```{r NYS R Calculations}
-state <- nys %>%
-     group_by(t) %>%
-     summarise(S = sum(I))
-t_start <- seq(2, nrow(state) - 3)
-t_end <- seq(5, nrow(state))
-R.instantaneous <- estimate_R(state$S,
-                              method = "parametric_si",
-                              config = list(mean_si = 3.96,
-                                            std_si = 4.75))
-```
 
 The estimate of the most recent R<sub>t</sub> is <b> `r round(R.instantaneous$R$'Mean(R)'[length(R.instantaneous$R$t_start)], 3)` </b>
 The 95% Confidence interval around this estimate is quite narrow, and can't be seen clearly given the scale of the graph.  A Histogram of the estimates of R<sub>t</sub> at the most recent point is given below.
@@ -488,29 +569,7 @@ ggplot(data = nys) +
 
 New York City deaths are combined from New York, Bronx, Kings, Queens and Richmond counties.
 
-```{r County Deaths Calculations}
-NYdeaths1 <- NYdeaths %>%
-     select(county, date, deaths) %>%
-     group_by(county) %>%
-     arrange(county, date) %>%
-     mutate(d = deaths - dplyr::lag(deaths, n = 1, default = 0)) %>%
-     ungroup()
-
-NYdeaths2 <- NYdeaths1 %>%
-     group_by(county) %>%
-     filter(max(d) > 100 & county != "Unknown")
-
-NYdeaths3 <- NYdeaths1 %>%
-     group_by(county) %>%
-     filter(max(d) > 10 & max(d) <= 100)
-
-NYdeaths4 <- NYdeaths1 %>%
-     group_by(county) %>%
-     filter(max(d) <= 10)
-```
-
 ```{r County Deaths 1, fig.height=5, fig.width=20}
-
 ggplot(data = NYdeaths2) +
      geom_point(mapping = aes(x = date, y = d)) +
      geom_label_repel(
@@ -610,61 +669,7 @@ ggplot(data = NYdeaths4) +
 Counties with fewer than 11 cases per week, on average, do not have enough data to accurately estimate R<sub>t</sub>.  For those counties, R<sub>t</sub> and the 95% Confidence Interval are listed as NA.  On the map, they are left blank.
 
 ```{r Counties R, fig.width=20, fig.height=20}
-NYcounties <- unique(nys$county)
-ROutput <- tibble(County = NYcounties, R = 0, Std = "")
-
-RInput <- function(co) {
-     return(list(nys$I[nys$county == co]))
-}
-
-## produce a list of lists,
-## each item is a list of daily incidence by County, labelled by County Name
-
-df4 <- vapply(NYcounties, RInput, list(1))
-
-## Iterate over the list of incidences by county,
-## Use the estimate_R function to estimate R and it's std for each county
-## Assign those values to the ROutput data.frame
-
-for (Incidence in names(df4)) {
-     if (sum(df4[[Incidence]]) * 7 / length(df4[[Incidence]]) > 11) {
-          R0 <- estimate_R(
-               incid = df4[[Incidence]],
-               method = "parametric_si",
-               config = list(mean_si = 3.96,
-                             std_si = 4.75)
-          )
-          n <- length(R0$R$t_start)
-          std <- round(R0$R$'Std(R)'[n], 3)
-          R <- round(R0$R$'Mean(R)'[n], 3)
-          ROutput$R[ROutput$County == Incidence] <- R
-          ROutput$Std[ROutput$County == Incidence] <-
-               sprintf("(%.3f - %.3f)",
-                       R - 1.96 * std / sqrt(n),
-                       R + 1.96 * std / sqrt(n))
-     } else {
-          ROutput$R[ROutput$County == Incidence] <- NA
-          ROutput$Std[ROutput$County == Incidence] <- NA
-     }
-}
-
-ny_map2 <-
-     cbind(ny_map, st_coordinates(st_centroid(ny_map$geometry))) %>%
-     select(GEOID, County = NAME, X, Y) %>%
-     mutate(LabelDirection = if_else(X + 75 > 0, "A", "B"))
-ny_map3 <- ny_map2 %>%
-     inner_join(ROutput, by = "County") %>%
-     inner_join(NYpop, by = "GEOID") 
-
-ny_map3 %>%
-     as_tibble() %>%
-     arrange(desc(R)) %>%
-     select(
-          County,
-          "R<sub>t</sub>" = R,
-          "95% Confidence Interval" = Std,
-          "Population" = estimate
-     ) %>%
+ny_map4  %>%
      kable()
 
 ggplot(data = ny_map3) +
