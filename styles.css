@@ -1,11 +1,12 @@
+
 html {
     font-size: 14px;
 }
 
 body {
-    width: 87.5%;
     margin-left: 10px;
-    margin-right: auto;
+    margin-right: 10Px;
+    max-width: 90%;
     font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
     background-color: Linen;
     color: #111;
@@ -13,10 +14,16 @@ body {
 }
 
 
+.title {
+    text-align: center;
+}
+
+
+
 h1 {
-    margin-top: 100px;;
+    margin-top: 100px;
     margin-bottom: 20px;
-    margin-left: 0px;
+    margin-left: 0;
     font-weight: 700;
     font-family: "Palatino Linotype";
     line-height: 1; 
@@ -24,12 +31,9 @@ h1 {
 
 h2 {
     font-weight: 600;
-    margin-left: 0px;
+    margin-left: 0;
     font-family: "Palatino Linotype";
     line-height: 1;
-}
-
-h2 {
     counter-reset: section3;
 }
 
@@ -42,7 +46,7 @@ h3 {
     font-weight: 400;
     margin-top: 1.7rem;
     margin-bottom: 1.4rem;
-    margin-left: 0px;
+    margin-left: 0;
     line-height: 1;
     counter-reset: section4;
 }
@@ -67,6 +71,12 @@ h4 {
     counter-reset: section5;
 }
 
+h4.author, h4.date {
+    font-weight: 300;
+    font-size: 16px;
+    text-align: center;
+}
+
 h5::before {
     counter-increment: section5;
     content: counter(section5, lower-roman) ". ";
@@ -84,11 +94,11 @@ h6 {
     margin-left: 75px;
 }
 
-ol.1 {
+ol {
   margin-left: 40px;
 }
 
-ol.a {
+.a {
     margin-left: 45px;
 }
 
@@ -97,30 +107,8 @@ ol.a {
 }
 
 p:not(#math) {
-    margin-left: 50px;
+    margin-left: 0;
     font-size: 16px;
-}
-
-.title {
-    text-align: center;
-}
-
-.author {
-    position: relative;
-    float: right;
-    clear: right;
-    margin-top: 0px;
-    margin-bottom: 0px;
-    background-color: linen;
-}
-
-.date{
-    position: relative;
-    float: right;
-    clear: right;
-    margin-top: 0px;
-    margin-bottom: 0px;
-    background-color: linen;
 }
 
 #note {
@@ -132,7 +120,7 @@ p:not(#math) {
     font-size: 12px;
 }
 
-pre.r {
+.r {
     margin-left: 100px;
     max-width: 672px;
     padding-left: 5px;
@@ -159,6 +147,7 @@ img {
 
 table {
     margin-left: 100px;
+    width: 60%;
     border: 1px solid black;
     border-collapse: collapse;
     border-spacing: 15px 5px;
@@ -167,13 +156,15 @@ table {
 th {
     border-bottom: 1px solid #ddd;
     text-align: left;
-    background-color: rgb(0,190,255);opacity:0.6;
+    background-color: rgb(0,190,255);
+    opacity: 0.6;
     padding: 15px;
 }
 
 td {
     border-bottom: 1px solid #ddd;
     padding: 15px;
+    text-align: left;
 }
 
 /**
@@ -224,3 +215,78 @@ footer :target {
 [aria-label="Back to content"] {
   font-size: 0.8em;
 }
+
+#grad1 {
+  height: 200px;
+  background-image: linear-gradient(rgba(255,0,0,0), rgba(255,0,0,1));
+  /* Standard syntax (must be last) */
+}
+
+/**
+ * Table of Contents
+ *
+ *
+ *
+ * .container-fluid {
+ *   padding-left: 0;
+ *
+ * }
+ */
+
+
+/**
+* {
+  box-sizing: border-box;
+}
+
+.header {
+    display: flex;
+    padding: 60px;
+    text-align: center;
+    background: linen;
+}
+
+.row {  
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.side {
+    flex: 50px;
+    position: fixed;    
+    background: linen none repeat scroll 0 0;
+    font-size: 95%;
+    text-align: left;
+    top: 0;
+    left: 0;
+    overflow-y: auto;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+
+}
+
+.main {
+  flex: auto;
+  background-color: linen;
+  padding: 0;
+}
+
+.author {
+    position: relative;
+    float: right;
+    clear: right;
+    margin-top: 0;
+    margin-bottom: 0;
+    background-color: linen;
+}
+
+.date{
+    position: relative;
+    float: right;
+    clear: right;
+    margin-top: 0;
+    margin-bottom: 0;
+    background-color: linen;
+}
+*/
