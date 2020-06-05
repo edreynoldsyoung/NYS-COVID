@@ -422,6 +422,8 @@ Because of the latency from time of infection to symptoms, and then to diagnosis
 
 The effect of an intervention can be measured in two ways.  The first, and most intuitive, is to extend the regression line from before the intervention, and measure the distance to the regression line after the intervention.  This gives an estimation of the difference between what the number of infections might have been without an intervention, and what it was with an intervention - that is, the effect size of the intervention.  A second, more abstract, way is to compare the slopes of the two regression lines.  Although this is a measurement of the intervention, it is not intuitively clear what that change in slope represents.
 
+These charts are for demonstration purposes only.  The regression lines are drawn using simple linear regression, rather than an ARIMA model, which is more appropriate for time series.  Therefore, I have not calculated the confidence intervals.
+
 
 # New York State New Cases
 ```{r NYS New}
