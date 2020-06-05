@@ -1,7 +1,7 @@
 ---
 title: "New York State COVID-19"
 author: "Ed Young"
-date: 
+date:  '`r format(Sys.Date(), "%B %d, %Y")`'
 output:
   html_document:
     css: styles.css
@@ -13,10 +13,12 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE,
-                      warning = FALSE,
-                      message = FALSE,
-                      cache = TRUE)
+knitr::opts_chunk$set(
+     echo = FALSE,
+     warning = FALSE,
+     message = FALSE,
+     cache = FALSE
+)
 check_load_pkgs <- function() {
      if (!require(tidyverse)) {
           message("installing the 'tidyverse' package")
@@ -58,14 +60,14 @@ check_load_pkgs <- function() {
           message("installing the 'tidycensus' package")
           install.packages(tidycensus)
      }
-     if (!require(albersusa)) {
-          message("installing the 'albersusa' package")
-          install.packages(albersusa)
+     if (!require(scales)) {
+          message("installing the 'scales' package")
+          install.packages(scales)
      }
-     if (!require(colorspace)) {
-          message("installing the 'colorspace' package")
-          install.packages(colorspace)
-     }     
+     if (!require(viridis)) {
+          message("installing the 'viridis' package")
+          install.packages(viridis)
+     }
 }
 check_load_pkgs()
 options(tigris_class = "sf")
@@ -86,15 +88,16 @@ nys <-
           I = as.integer(I),
           C = as.integer(C),
           T = as.integer(T),
-          f = fips("NY", county=county)
+          f = fips("NY", county = county)
      ) %>%
      arrange(f, t)
 nysCounty1 <- nys %>%
      group_by(county) %>%
-     filter(max(I) > 100)
+     filter(max(I) > 100) %>%
+     ungroup()
 nysCounty2 <- nys %>%
      group_by(county) %>%
-     filter(max(I) > 10 & max(I) <=100) 
+     filter(max(I) > 10 & max(I) <= 100)
 nysCounty3 <- nys %>%
      group_by(county) %>%
      filter(max(I) <= 10)
@@ -113,7 +116,7 @@ Cases <-
           header = TRUE,
           sep = ","
      ) %>%
-     filter(fips<60) %>%
+     filter(fips < 60) %>%
      mutate(
           date = as.Date(date),
           state = as.character(state),
@@ -125,9 +128,11 @@ Cases2 <- Cases %>%
      select(f, date, cases) %>%
      arrange(f, date) %>%
      group_by(f) %>%
-     mutate(I = if_else(cases - lag(cases, n = 1, default = 0)>0, 
-                        cases - lag(cases, n = 1, default = 0), 
-                        0)) %>%
+     mutate(I = if_else(
+          cases - lag(cases, n = 1, default = 0) > 0,
+          cases - lag(cases, n = 1, default = 0),
+          0
+     )) %>%
      ungroup()
 
 ## Download data on deaths at County level from NY Times
@@ -150,7 +155,8 @@ NYDeaths <- USDeaths %>%
      select(date, deaths) %>%
      group_by(date) %>%
      summarise(SD = sum(deaths)) %>%
-     mutate(d = SD - lag(SD, n = 1, default = 0))
+     mutate(d = SD - lag(SD, n = 1, default = 0)) %>%
+     ungroup()
 NYCountyDeaths <- USDeaths %>%
      filter(state == "New York") %>%
      select(county, date, deaths) %>%
@@ -160,26 +166,29 @@ NYCountyDeaths <- USDeaths %>%
      ungroup()
 NYCountyDeaths1 <- NYCountyDeaths %>%
      group_by(county) %>%
-     filter(max(d) > 100 & county != "Unknown")
+     filter(max(d) > 100 & county != "Unknown") %>%
+     ungroup()
 NYCountyDeaths2 <- NYCountyDeaths %>%
      group_by(county) %>%
-     filter(max(d) > 10 & max(d) <= 100)
+     filter(max(d) > 10 & max(d) <= 100) %>%
+     ungroup()
 NYCountyDeaths3 <- NYCountyDeaths %>%
      group_by(county) %>%
-     filter(max(d) <= 10)
+     filter(max(d) <= 10) %>%
+     ungroup()
 
 ## Download US State map
 
 United_States_map <- states() %>%
-     filter(STATEFP<60) %>%
+     filter(STATEFP < 60) %>%
      mutate(f = as.character(as.numeric(STATEFP))) %>%
      select(f, STUSPS)
-     
+
 ## Download New York County map data
 
-ny_map <- counties(state = 36) %>% 
-     mutate(f=paste0(STATEFP, COUNTYFP)) %>%
-     select(GEOID, County = NAME, f) 
+ny_map <- counties(state = 36) %>%
+     mutate(f = paste0(STATEFP, COUNTYFP)) %>%
+     select(GEOID, County = NAME, f)
 
 
 ## Download census data
@@ -187,29 +196,26 @@ ny_map <- counties(state = 36) %>%
 
 NYpop <-
      get_acs(geography = "county",
-             state = "NY",
-             variables = "B01003_001")
-NYpop$NAME <-
-     str_replace(NYpop$NAME, "(.*) County, New York", "\\1")
-NYpop <- NYpop %>% select(GEOID, county = NAME, estimate)
+             state = 36,
+             variables = "B01003_001") %>%
+     select(GEOID,  estimate)
 
 USpop <-
      get_acs(geography = "state",
              variables = "B01003_001") %>%
-     filter(GEOID<60) %>%
+     filter(GEOID < 60) %>%
      mutate("f" = as.character(as.numeric(GEOID))) %>%
      select(f,
-	"State" = NAME,
-     	"Population" = estimate)
+            "State" = NAME,
+            "Population" = estimate)
 
 
 
-## Calculate Rt using the EpiEstim Package for New York State 
+## Calculate Rt using the EpiEstim Package for New York State
 ## The window for estimating Rt can be adjusted using t_start and t_end.
 ## The default setting for the window is 7 days
 
-t_start <- seq(2, nrow(state) - 3)
-t_end <- seq(5, nrow(state))
+
 R.instantaneous <- estimate_R(state$SI,
                               method = "parametric_si",
                               config = list(mean_si = 3.96,
@@ -224,72 +230,187 @@ R.instantaneous <- estimate_R(state$SI,
 ## 5. Assign those values to an ROutput data.frame
 
 
-makeRoutput <- function(df) {
-     lof <- df %>% select(f) %>% unique() %>% filter(!is.na(f)) %>% as.list()
-     ROutput <- tibble(f=lof$f, 
-                       R = 0, 
-                       Std = "")
+makeRoutput <- function(df, tn) {
+     lof <-
+          df %>% select(f) %>% unique() %>% filter(!is.na(f)) %>% as.list()
+     ROutput <- tibble(
+          f = lof$f,
+          R = 0,
+          Std = 0,
+          Confl = 0,
+          Confh = 0
+     )
      for (fips in lof$f) {
-          x <- df %>% filter(f==fips, !is.na(I)) %>% select(I) %>% sum()
-          y <- df %>% filter(f==fips, !is.na(I)) %>% select(I) %>% lengths()
+          x <- df %>% filter(f == fips, !is.na(I)) %>% select(I) %>% sum()
+          y <-
+               df %>% filter(f == fips, !is.na(I)) %>% select(I) %>% lengths()
           if (x * 7 / y > 11) {
+               t_start <- seq(2, y - tn)
+               t_end <- t_start + tn
                R0 <- estimate_R(
-                    incid = df %>% filter(f==fips, !is.na(I)) %>% select(I),
+                    incid = df %>% filter(f == fips, !is.na(I)) %>% select(I),
                     method = "parametric_si",
-                    config = list(mean_si = 3.96,
-                                  std_si = 4.75)
+                    config = make_config(
+                         list(
+                              mean_si = 3.96,
+                              std_si = 4.75,
+                              t_start = t_start,
+                              t_end = t_end
+                         )
+                    )
                )
                n <- length(R0$R$t_start)
                std <- round(R0$R$'Std(R)'[n], 3)
                R <- round(R0$R$'Mean(R)'[n], 3)
                ROutput$R[ROutput$f == fips] <- R
-               ROutput$Std[ROutput$f == fips] <-
-                    sprintf("(%.3f - %.3f)",
-                              R - 1.96 * std / sqrt(n),
-                              R + 1.96 * std / sqrt(n))
+               ROutput$Std[ROutput$f == fips] <- std
+               ROutput$Confl[ROutput$f == fips] <-
+                    R - 1.96 * std / sqrt(n)
+               ROutput$Confh[ROutput$f == fips] <-
+                    R + 1.96 * std / sqrt(n)
           } else {
                ROutput$R[ROutput$f == fips] <- NA
                ROutput$Std[ROutput$f == fips] <- NA
+               ROutput$Confl[ROutput$f == fips] <- NA
+               ROutput$Confh[ROutput$f == fips] <- NA
           }
      }
      return(ROutput)
 }
 
 
-ROutput <- makeRoutput(nys)
-ROutput.US <- makeRoutput(Cases2)
+ROutput.NY <- makeRoutput(nys, 7)
+ROutput.US <- makeRoutput(Cases2, 7)
 
+#####################################################################################
+# Calculate the Effect Size of an intervention by noting the difference between the
+# predicted value from the regression line before the intervention, and the value
+# from the regression line after the intervention at the same point after the
+# intervention.
+
+forNYS <- nysCounty1
+forNYS$I[forNYS$I == 0] <- NA
+clength <- length(unique(forNYS$county))
+CSD <- tibble(
+     "County" = unique(forNYS$county),
+     b = rep.int(0, clength),
+     a = rep.int(0, clength),
+     d = rep.int(0, clength),
+     g = rep.int(0, clength),
+     y_int1 = rep.int(0, clength),
+     y_int2 = rep.int(0, clength),
+     y_int3 = rep.int(0, clength)
+)
+for (c in unique(forNYS$county)) {
+     x <-
+          lm(log10(I) ~ t, data = filter(forNYS, t <= as.Date("2020-03-20") &
+                                              county == c), na.action=na.omit)
+     y <-
+          lm(log10(I) ~ t, data = filter(forNYS, t >= as.Date("2020-04-03") &
+                                              county == c), na.action=na.omit)
+     z <-
+          10 ^ (predict(x, data.frame(t = as.Date("2020-04-03")))) - 10 ^ y$fitted.values[1]
+     CSD$b[CSD$County == c] <- x$coefficients[2]
+     CSD$a[CSD$County == c] <- y$coefficients[2]
+     CSD$d[CSD$County == c] <- x$coefficients[2] - y$coefficients[2]
+     CSD$g[CSD$County == c] <- z
+     CSD$y_int1[CSD$County == c] <- 10^tail(x$fitted.values, 1)
+     CSD$y_int2[CSD$County == c] <- 10^(tail(x$fitted.values, 1)+14*x$coefficients[2])
+     CSD$y_int3[CSD$County == c] <- 10^y$model$`log10(I)`[1]
+}
+
+CSD <- CSD %>%
+     arrange(desc(g)) %>%
+     mutate(
+          "SlopeBefore" = round(b, 3),
+          "SlopeAfter" = round(a, 3),
+          "SlopeDiff" = round(d, 3),
+          "EffectSize" = round(g, 0)
+     ) %>%
+     select(
+          County,
+          "SlopeBefore",
+          "SlopeAfter",
+          "SlopeDiff",
+          "EffectSize",
+          y_int1,
+          y_int2,
+          y_int3
+     )
+
+forNYS <- forNYS %>% 
+     inner_join(CSD, by = c("county"="County"))
+
+#####################################################
 # Joining data from Map, Census, and Rt estimation
 
 ny_map3 <- ny_map %>%
-     inner_join(ROutput, by = "f") %>%
-     inner_join(NYpop, by = "GEOID") 
+     inner_join(ROutput.NY, by = "f") %>%
+     inner_join(NYpop, by = "GEOID")
 
 ny_map4 <- ny_map3 %>%
      as_tibble() %>%
-     arrange(desc(R)) %>%
-     select(
-          County,
-          "R<sub>t</sub>" = R,
-          "95% Confidence Interval" = Std,
-          "Population" = estimate
-     )
+     arrange(County) %>%
+     select(County,
+            R,
+            Confl,
+            Confh,
+            "Population" = estimate)
 
 us_map <- ROutput.US %>%
      inner_join(United_States_map, by = "f") %>%
      inner_join(USpop, by = "f")
 
 us_map48 <- us_map %>%
-	 filter(!(State %in% c("Alaska", "District of Columbia", "Hawaii", "Puerto Rico")))
+     filter(!(
+          State %in% c("Alaska", "District of Columbia", "Hawaii", "Puerto Rico")
+     ))
 
 us_map4 <- us_map48 %>%
-     arrange(desc(R)) %>%
-     select(
-          State,
-          "R<sub>t</sub>" = R,
-          "95% Confidence Interval" = Std,
-          Population
-     ) 
+     arrange(State) %>%
+     select(State,
+            R,
+            Confl,
+            Confh,
+            Population) %>%
+     tibble()
+
+###########################################################
+# Barrier-free color palette
+# Source: Okabe & Ito (2008): Color Universal Design (CUD):
+#         Fig. 16 of <https://jfly.uni-koeln.de/color/>:
+
+# (a) Vector of colors (as RGB values):
+o_i_colors <- c(
+     rgb(0,   0,   0, maxColorValue = 255),
+     # black
+     rgb(230, 159,   0, maxColorValue = 255),
+     # orange
+     rgb(86, 180, 233, maxColorValue = 255),
+     # skyblue
+     rgb(0, 158, 115, maxColorValue = 255),
+     # green
+     rgb(240, 228,  66, maxColorValue = 255),
+     # yellow
+     rgb(0, 114, 178, maxColorValue = 255),
+     # blue
+     rgb(213,  94,   0, maxColorValue = 255),
+     # vermillion
+     rgb(204, 121, 167, maxColorValue = 255)   # purple
+)
+
+# (b) Vector of color names:
+o_i_names <-
+     c("black",
+       "orange",
+       "skyblue",
+       "green",
+       "yellow",
+       "blue",
+       "vermillion",
+       "purple")
+
+names(o_i_colors) <- o_i_names
 ```
 
 
@@ -299,95 +420,142 @@ The first set of graphs represent new cases of COVID-19 in the state of New York
 
 Because of the latency from time of infection to symptoms, and then to diagnosis, it may take up to 14 days after a change in policy for the number of new cases to decrease.  I have indicated that two week period after the policy of social distancing enforcement with gray dots.  Regression lines before and after the policy omit that two week period. 
 
+The effect of an intervention can be measured in two ways.  The first, and most intuitive, is to extend the regression line from before the intervention, and measure the distance to the regression line after the intervention.  This gives an estimation of the difference between what the number of infections might have been without an intervention, and what it was with an intervention - that is, the effect size of the intervention.  A second, more abstract, way is to compare the slopes of the two regression lines.  Although this is a measurement of the intervention, it is not intuitively clear what that change in slope represents.
+
 
 # New York State New Cases
 ```{r NYS New}
 ggplot(data = state) +
-  geom_point(mapping = aes(x = t, y = SI)) +
-  geom_label_repel(
-    data = filter(state, t == max(t)),
-    aes(
-      x = t,
-      y = SI,
-      label = sprintf("%i", SI)
-    ),
-    segment.color = "black",
-    nudge_x = -10,
-    nudge_y = 50
-  ) +
-  labs(x = "Date",
-       y = "New Cases per Day") +
-  geom_vline(xintercept = as.Date("2020-03-20"), linetype = 4) +
-  geom_rect(
-    aes(
-      xmin = as.Date("2020-03-20"),
-      xmax = as.Date("2020-04-03"),
-      ymin = 0,
-      ymax = Inf
-    ),
-    fill = "gray100",
-    alpha = 0.01
-  ) +
-  geom_label(label = "Social Distancing Enforced",
-             x = as.Date("2020-03-20"),
-             y = max(state$SI)) +
-  theme(
-    plot.background = element_rect(fill = "linen"),
-    panel.background = element_rect(fill = "linen"),
-    axis.line = element_line(color = "black")
-  ) +
-  ggtitle(label = "New Cases - Natural Scale")
+     geom_point(mapping = aes(x = t, y = SI)) +
+     geom_label_repel(
+          data = filter(state, t == max(t)),
+          aes(
+               x = t,
+               y = SI,
+               label = sprintf("%i", SI)
+          ),
+          segment.color = "black",
+          nudge_x = -10,
+          nudge_y = 50
+     ) +
+     geom_vline(xintercept = as.Date("2020-03-20"), linetype = 4) +
+     geom_rect(
+          aes(
+               xmin = as.Date("2020-03-20"),
+               xmax = as.Date("2020-04-03"),
+               ymin = 0,
+               ymax = Inf
+          ),
+          fill = "gray100",
+          alpha = 0.01
+     ) +
+     geom_label(label = "Social Distancing Enforced",
+                x = as.Date("2020-03-20"),
+                y = max(state$SI))  +
+     labs(x = "Date",
+          y = "New Cases per Day") +
+     theme(
+          plot.background = element_rect(fill = "linen"),
+          panel.background = element_rect(fill = "linen"),
+          axis.line = element_line(color = "black")
+     ) +
+     ggtitle(label = "New Cases - Natural Scale")
 
+state1 <- state
+state1$SI[state1$SI == 0] <- 1
+before <-
+     lm(log10(SI) ~ t, data = filter(state1, t <= as.Date("2020-03-20")))
+after <-
+     lm(log10(SI) ~ t, data = filter(state, t >= as.Date("2020-04-03")))
 ggplot(data = state) +
-  geom_point(mapping = aes(x = t, y = SI)) +
-  geom_rect(
-    aes(
-      xmin = as.Date("2020-03-20"),
-      xmax = as.Date("2020-04-03"),
-      ymin = 0,
-      ymax = Inf
-    ),
-    fill = "gray100",
-    alpha = 0.01
-  ) +
-  geom_label_repel(
-    data = filter(state, t == max(t)),
-    aes(
-      x = t,
-      y = SI,
-      label = sprintf("%i", SI)
-    ),
-    segment.color = "black",
-    nudge_x = -10,
-    nudge_y = 50
-  ) +
-  labs(x = "Date",
-       y = "New Cases per Day") +
-  scale_y_log10() +
-  geom_vline(xintercept = as.Date("2020-03-20"), linetype = 4) +
-  geom_label(label = "Social Distancing Enforced",
-             x = as.Date("2020-03-20"),
-             y = 0) +
-  geom_smooth(
-    data = filter(state, t <= as.Date("2020-03-20")),
-    mapping = aes(x = t, y = SI),
-    colour = "red",
-    method = lm,
-    se = FALSE
-  ) +
-  geom_smooth(
-    data = filter(state, t >= as.Date("2020-04-03")),
-    mapping = aes(x = t, y = SI),
-    colour = "green",
-    method = lm,
-    se = FALSE
-  ) +
-  theme(
-    plot.background = element_rect(fill = "linen"),
-    panel.background = element_rect(fill = "linen"),
-    axis.line = element_line(color = "black")
-  ) +
-  ggtitle(label = "New Cases - Log Scale")
+     geom_point(mapping = aes(x = t, y = SI)) +
+     geom_rect(
+          aes(
+               xmin = as.Date("2020-03-20"),
+               xmax = as.Date("2020-04-03"),
+               ymin = 0,
+               ymax = Inf
+          ),
+          fill = "gray100",
+          alpha = 0.01
+     ) +
+     geom_label(
+          data = filter(state, t == max(t)),
+          aes(
+               x = t,
+               y = SI,
+               label = sprintf("%i", SI)
+          ),
+          segment.color = "black",
+          nudge_x = -10,
+          nudge_y = 20
+     ) +
+     geom_vline(xintercept = as.Date("2020-03-20"), linetype = 4) +
+     geom_label(label = "Social Distancing Enforced",
+                x = as.Date("2020-03-20"),
+                y = 0) +
+     geom_text(aes(
+          label = sprintf(
+               "Difference in Slope = %.3f",
+               before$coefficients[2] - after$coefficients[2]
+          ),
+          x = as.Date("2020-04-03"),
+          y = max(SI) / 4
+     )) +
+     geom_smooth(
+          data = filter(state, t <= as.Date("2020-03-20")),
+          mapping = aes(x = t, y = SI),
+          colour = "red",
+          method = lm,
+          na.rm = TRUE,
+          se = FALSE
+     ) +
+     geom_segment(
+          aes(
+               x = as.Date("2020-03-20"),
+               y = 10 ^ before$model$`log10(SI)`[18],
+               xend = as.Date("2020-04-03"),
+               yend = 10 ^ (before$model$`log10(SI)`[18] + 14 * before$coefficients[2]),
+          ),
+          linetype = 2,
+          color = "red",
+          show.legend = NA
+     ) +
+     geom_segment(
+          aes(
+               x    = as.Date("2020-04-03"),
+               y    = 10 ^ (before$model$`log10(SI)`[18] + 14 * before$coefficients[2]),
+               xend = as.Date("2020-04-03"),
+               yend = 10 ^ after$model$`log10(SI)`[1]
+          ),
+          linetype = 2,
+          color = "black",
+          show.legend = NA
+     ) +
+     geom_text(
+          aes(label = sprintf("Effect Size = %.0f",
+                              10 ^ (before$model$`log10(SI)`[18] + 14 * before$coefficients[2]) - 10 ^after$model$`log10(SI)`[1]),
+              x = as.Date("2020-04-15"),
+              y = (10 ^ (before$model$`log10(SI)`[18] + 14 * before$coefficients[2]) - 10 ^after$model$`log10(SI)`[1]) / 10
+              )
+          ) +
+     geom_smooth(
+          data = filter(state, t >= as.Date("2020-04-03")),
+          mapping = aes(x = t, y = SI),
+          colour = "green",
+          method = lm,
+          na.rm = TRUE,
+          se = FALSE
+     ) +
+     labs(x = "Date",
+          y = "New Cases per Day") +
+     scale_y_log10(limits = c(1, 2000000), labels = comma) +
+     theme(
+          plot.background = element_rect(fill = "linen"),
+          panel.background = element_rect(fill = "linen"),
+          axis.line = element_line(color = "black")
+     ) +
+     ggtitle(label = "New Cases - Log Scale")
 ```
 
 \pagebreak
@@ -420,7 +588,8 @@ ggplot(data = state) +
   ) +
   labs(x = "Date",
        y = "Log Scale of Cummulative Cases") +
-  scale_y_log10(breaks = c(10, 100, 1000, 10000, 100000)) +
+  scale_y_log10(breaks = c(10, 100, 1000, 10000, 100000),
+                labels = comma) +
   geom_vline(xintercept = as.Date("2020-03-20"), linetype = 4) +
   geom_label(label = "Social Distancing Enforced",
              x = as.Date("2020-03-20"),
@@ -451,7 +620,8 @@ ggplot(data = state) +
     fill = "gray100",
     alpha = 0.01
   ) +
-  geom_smooth(mapping = aes(x = t, y = SI * 100 / ST)) +
+  geom_smooth(mapping = aes(x = t, y = SI * 100 / ST),
+              method = "gam") +
   geom_label_repel(
     data = filter(state, t == max(t)),
     aes(
@@ -475,7 +645,7 @@ ggplot(data = state) +
   geom_vline(xintercept = as.Date("2020-03-20"), linetype = 4) +
   geom_label(label = "Social Distancing Enforced",
              x = as.Date("2020-03-20"),
-             y = 100) +
+             y = -5) +
   labs(x = "Date",
        y = "Percentage of Tests Performed that were Positive") +
   theme(
@@ -566,25 +736,29 @@ hist(R.sample)
 
 # Number of New Cases by County
 
+I have devided the counties into three groups:  those that had more than 100 new cases on at least one day; those that had between 10 and 100 cases on one day; and those that had less than 10 cases on any day.
+
+I only ran regressions on those counties with more than 100 cases on a day.
+
 ```{r County New 1,  fig.height=20, fig.width=20}
-ggplot(data = nysCounty1) +
+ggplot(data = forNYS) +
      geom_point(mapping = aes(x = t, y = I)) +
-  geom_rect(
-    aes(
-      xmin = as.Date("2020-03-20"),
-      xmax = as.Date("2020-04-03"),
-      ymin = 0,
-      ymax = Inf
-    ),
-    fill = "gray100",
-    alpha = 0.01
-  ) +  
+     geom_rect(
+          aes(
+               xmin = as.Date("2020-03-20"),
+               xmax = as.Date("2020-04-03"),
+               ymin = 0,
+               ymax = Inf
+          ),
+          fill = "gray100",
+          alpha = 0.01
+     ) +
      labs(x = "Date",
           y = "New Cases per Day") +
-     scale_y_log10() +
+     scale_y_log10(labels = comma) +
      geom_vline(xintercept = as.Date("2020-03-20"), linetype = 4) +
      geom_label_repel(
-          data = filter(nysCounty1, t == max(t)),
+          data = filter(forNYS, t == max(t)),
           aes(
                x = t,
                y = I,
@@ -592,9 +766,54 @@ ggplot(data = nysCounty1) +
           ),
           segment.color = "black",
           nudge_x = -10,
-          nudge_y = 500
+          nudge_y = 50
      ) +
-     facet_wrap(~ county, ncol = 4) +
+     geom_smooth(
+          data = filter(forNYS, t <= as.Date("2020-03-20")),
+          mapping = aes(x = t, y = I),
+          colour = "red",
+          method = lm,
+          na.rm = TRUE,
+          se = FALSE
+     ) +
+     geom_smooth(
+          data = filter(forNYS, t >= as.Date("2020-04-03")),
+          mapping = aes(x = t, y = I),
+          colour = "green",
+          method = lm,
+          na.rm = TRUE,
+          se = FALSE
+     ) +
+     geom_segment(
+          aes(
+               x = as.Date("2020-03-20"),
+               y = y_int1,
+               xend = as.Date("2020-04-03"),
+               yend = y_int2
+          ),
+          linetype = 2,
+          color = "red",
+          show.legend = NA
+     ) +
+     geom_segment(
+          aes(
+               x    = as.Date("2020-04-03"),
+               y    = y_int2,
+               xend = as.Date("2020-04-03"),
+               yend = y_int3
+          ),
+          linetype = 2,
+          color = "black",
+          show.legend = NA
+     ) +
+     geom_text(
+          aes(
+               label = sprintf("Effect Size is %.0f", EffectSize),
+               x = as.Date("2020-04-20"),
+               y = y_int2/10
+               )
+          ) +
+     facet_wrap(vars(county), ncol = 4) +
      theme(
           plot.background = element_rect(fill = "linen"),
           panel.background = element_rect(fill = "linen"),
@@ -612,6 +831,33 @@ ggplot(data = nysCounty1) +
      ggtitle("Counties with a maximum of over 100 New Cases on a single day")
 ```
 
+# Effect Size
+
+Note that greatest change in the slope of the curves has happened in the heaviest hit counties. 
+
+
+```{r County Slope Difference, fig.width=10, fig.height=10}
+#CSD %>%  kable()
+ggplot(CSD, aes(y=County, x = `EffectSize`, size = `SlopeDiff`, color = `SlopeDiff`)) +
+     geom_point() +
+     scale_color_viridis_c() + 
+     scale_x_continuous(labels = comma,
+                        limits = c(-300, 400000)) +
+     guides(color = guide_legend(title = "Difference in Slope"), 
+            size = guide_legend(title = "Difference in Slope")
+            ) +
+     labs(x="Effect Size",
+          y=NULL) +
+     theme(
+          panel.background = element_rect(fill = "linen"),
+          rect = element_rect(fill = "linen"),
+          plot.background = element_rect(fill = "linen"),
+          legend.background = element_rect(fill = "linen"),
+          panel.grid.minor = element_blank()
+     )    
+```
+
+
 ```{r County New 2,  fig.height=30, fig.width=20}
 ggplot(data = nysCounty2) +
   geom_point(mapping = aes(x = t, y = I)) +
@@ -628,7 +874,8 @@ ggplot(data = nysCounty2) +
   labs(x = "Date",
        y = "New Cases per Day") +
   geom_vline(xintercept = as.Date("2020-03-20"), linetype = 4) +
-  scale_y_log10() +
+ scale_y_continuous(breaks = seq(0, 100, by=20),
+                        limits = c(0, 100)) +  
   geom_label_repel(
     data = filter(nysCounty2, t == max(t)),
     aes(
@@ -638,7 +885,7 @@ ggplot(data = nysCounty2) +
     ),
     segment.color = "black",
     nudge_x = -10,
-    nudge_y = 20
+    nudge_y = 5
   ) +
   facet_wrap( ~ county, ncol = 4) +
   theme(
@@ -728,7 +975,7 @@ ggplot(data = nys) +
           ),
           segment.color = "black",
           nudge_x = -10,
-          nudge_y = -4
+          nudge_y = -1
      ) +
      labs(x = "Date",
           y = "Log Scale of Cumulative Cases") +
@@ -860,7 +1107,7 @@ ggplot(data = NYCountyDeaths2) +
           ),
           segment.color = "black",
           nudge_x = -10,
-          nudge_y = 5
+          nudge_y = 2
      ) +
      labs(x = "Date",
           y = "Deaths") +
@@ -924,8 +1171,34 @@ ggplot(data = NYCountyDeaths3) +
 Counties with fewer than 11 cases per week, on average, do not have enough data to accurately estimate R<sub>t</sub>.  For those counties, R<sub>t</sub> and the 95% Confidence Interval are listed as NA.  On the map, they are left blank.
 
 ```{r Counties R, fig.width=10, fig.height=20}
-ny_map4  %>%
-     kable()
+ggplot(ny_map4, aes(y=County, x = R, size = Population, color = Population)) +
+     geom_point() +  
+     geom_pointrange(aes(xmin = Confl, 
+                         xmax = Confh)) +
+     annotate(geom = "rect", 
+              xmin = c(0, 0.5, 1, 1.2, 1.5),
+              xmax = c(0.5, 1, 1.2, 1.5, 2),
+              ymin = -Inf,
+              ymax = Inf,
+              fill = c(o_i_colors[1:5]),
+              alpha = 0.1) +
+     scale_x_continuous(breaks = c(0.5, 1, 1.2, 1.5, 2)) +
+     scale_size(labels = comma,
+                breaks = c(1000, 5000, 10000,50000,100000,200000, 500000, 1000000, 2000000),
+                range = c(0.1,3)) + 
+     scale_color_viridis_c(labels = comma,
+                breaks = c(1000, 5000, 10000,50000,100000,200000, 500000, 1000000, 2000000)) +
+     labs(x = bquote(R[t])) +
+     guides(color = guide_legend(), 
+            size = guide_legend()) +
+     scale_y_discrete(limits = sort(ny_map4$County, decreasing = TRUE))  +
+     theme(
+          panel.background = element_rect(fill = "linen"),
+          rect = element_rect(fill = "linen"),
+          plot.background = element_rect(fill = "linen"),
+          legend.background = element_rect(fill = "linen"),
+          panel.grid.minor = element_blank()
+     )    
 ```
 
 # Map of R<sub>t</sub> in New York State by County
@@ -935,11 +1208,7 @@ ggplot(data = ny_map3) +
      geom_sf(aes(fill = R)) +
      scale_fill_stepsn(
           breaks = c(0.5, 1, 1.2, 1.5),
-          colours =  c(rgb(44,123,182, max = 255),
-                   rgb(171,217,233, max = 255),
-                   rgb(255,255,191, max = 255),
-                   rgb(253,174,97, max = 255),
-                   rgb(215,25,28, max = 255))) +
+          colours = o_i_colors[2:8]) +
      labs(fill = bquote(R[t])) +
      geom_sf_text(aes(label = County, geometry=geometry)) +
      ylim(40, 46) +
@@ -953,29 +1222,52 @@ ggplot(data = ny_map3) +
           axis.ticks = element_blank(),
           panel.grid.major = element_blank(),
           panel.grid.minor = element_blank()
-     )     
+     )   
 ```
 
 # Estimation of R<sub>t</sub> in the United States by State
 
-
 ```{r States R, fig.width=10, fig.height=20}
-kable(us_map4)
+ggplot(us_map4, aes(y=State, x = R, size = Population, color = Population)) +
+     geom_point() + 
+     geom_pointrange(aes(xmin = Confl, 
+                         xmax = Confh)) +
+     annotate(geom = "rect", 
+              xmin = c(0, 0.5, 1, 1.2, 1.5),
+              xmax = c(0.5, 1, 1.2, 1.5, 2),
+              ymin = -Inf,
+              ymax = Inf,
+              fill = c(o_i_colors[1:5]),
+              alpha = 0.1) +
+     scale_x_continuous(breaks = c(0.5, 1, 1.2, 1.5, 2)) +
+     scale_size(labels = comma,
+                breaks = c(1000000, 5000000, 10000000,20000000,30000000,40000000),
+                range = c(0.1,3)) + 
+     scale_color_viridis_c(labels = comma,
+                breaks = c(1000000, 5000000, 10000000,20000000,30000000,40000000)) +  
+     labs(x= bquote(R[t])) +
+     guides(color = guide_legend(), 
+            size = guide_legend()) +
+     scale_y_discrete(limits = sort(us_map4$State, decreasing = TRUE)) +
+     theme(
+          panel.background = element_rect(fill = "linen"),
+          rect = element_rect(fill = "linen"),
+          plot.background = element_rect(fill = "linen"),
+          legend.background = element_rect(fill = "linen"),
+          panel.grid.minor = element_blank()
+     )    
+     
 ```
 
 # Map of R<sub>t</sub> in the United States
 
 ```{r US Map R, fig.width= 20, fig.height=8.4}
 ggplot(data = us_map48) +
-     geom_sf(aes(fill = R,
-                 geometry=geometry)) +
+     geom_sf(aes(fill = R, 
+                 geometry = geometry)) +
      scale_fill_stepsn(
        breaks = c(0.5, 1, 1.2, 1.5),
-       colours = c(rgb(44,123,182, max = 255),
-                   rgb(171,217,233, max = 255),
-                   rgb(255,255,191, max = 255),
-                   rgb(253,174,97, max = 255),
-                   rgb(215,25,28, max = 255))) +
+       colours = o_i_colors[2:8] ) +
      geom_sf_text(aes(label = STUSPS, geometry=geometry)) +
      labs(fill = bquote(R[t])) +
      theme(
