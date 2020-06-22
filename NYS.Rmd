@@ -270,7 +270,10 @@ ROutput.US <- makeRoutput(Cases2, 7)
 # from the regression line after the intervention at the same point after the
 # intervention.
 
-forNYS <- nysCounty1
+forNYS <- nys %>%
+     group_by(county) %>%
+     filter(max(I) > 100)
+
 forNYS$I[forNYS$I == 0] <- NA
 clength <- length(unique(forNYS$county))
 CSD <- tibble(
@@ -398,12 +401,13 @@ names(o_i_colors) <- o_i_names
 # Themes
 
 plot_theme <- theme(
-          plot.background = element_rect(fill = "linen"),
-          plot.title = element_text(face="bold", size=rel(1.5), hjust=0),
-          plot.subtitle = element_text(),
-          panel.background = element_rect(fill = "linen"),
-          axis.line = element_line(color = "black"),
-     )
+  plot.background = element_rect(fill = "linen"),
+  plot.title = element_text(face="bold", size=rel(1.5), hjust=0),
+  plot.subtitle = element_text(),
+  panel.background = element_rect(fill = "linen"),
+  axis.line = element_line(color = "black"),
+  legend.background = element_rect(fill = "linen")
+)
 
 double_axis_theme <-   theme(
     plot.background = element_rect(fill = "linen"),
@@ -698,8 +702,7 @@ ggplot(data = state) +
   labs(x = "Date",
        y = "Percentage of Tests Performed that were Positive") +
   double_axis_theme +
-  ggtitle(label = "Precentage Positive: New York State New Tests", subtitle = "Number of Tests Performed") +
-
+  ggtitle(label = "Precentage Positive: New York State New Tests", subtitle = "Number of Tests Performed")
 ```
 \pagebreak
 
