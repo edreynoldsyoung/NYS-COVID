@@ -68,6 +68,10 @@ check_load_pkgs <- function() {
           message("installing the 'viridis' package")
           install.packages(viridis)
      }
+     if (!require(ggridges)) {
+          message("installing the 'ggridges' package")
+          install.packages(ggridges)
+     }  
 }
 check_load_pkgs()
 options(tigris_class = "sf")
@@ -91,16 +95,7 @@ nys <-
           f = fips("NY", county = county)
      ) %>%
      arrange(f, t)
-nysCounty1 <- nys %>%
-     group_by(county) %>%
-     filter(max(I) > 100) %>%
-     ungroup()
-nysCounty2 <- nys %>%
-     group_by(county) %>%
-     filter(max(I) > 10 & max(I) <= 100)
-nysCounty3 <- nys %>%
-     group_by(county) %>%
-     filter(max(I) <= 10)
+
 state <- nys %>%
      group_by(t) %>%
      summarise(SI = sum(I),
@@ -158,23 +153,11 @@ NYDeaths <- USDeaths %>%
      mutate(d = SD - lag(SD, n = 1, default = 0)) %>%
      ungroup()
 NYCountyDeaths <- USDeaths %>%
-     filter(state == "New York") %>%
+     filter(state == "New York" & county != "Unknown") %>%
      select(county, date, deaths) %>%
      group_by(county) %>%
      arrange(county, date) %>%
      mutate(d = deaths - dplyr::lag(deaths, n = 1, default = 0)) %>%
-     ungroup()
-NYCountyDeaths1 <- NYCountyDeaths %>%
-     group_by(county) %>%
-     filter(max(d) > 100 & county != "Unknown") %>%
-     ungroup()
-NYCountyDeaths2 <- NYCountyDeaths %>%
-     group_by(county) %>%
-     filter(max(d) > 10 & max(d) <= 100) %>%
-     ungroup()
-NYCountyDeaths3 <- NYCountyDeaths %>%
-     group_by(county) %>%
-     filter(max(d) <= 10) %>%
      ungroup()
 
 ## Download US State map
@@ -277,7 +260,6 @@ makeRoutput <- function(df, tn) {
      }
      return(ROutput)
 }
-
 
 ROutput.NY <- makeRoutput(nys, 7)
 ROutput.US <- makeRoutput(Cases2, 7)
@@ -415,12 +397,45 @@ names(o_i_colors) <- o_i_names
 ###########################################################
 # Themes
 
-theme(
+plot_theme <- theme(
           plot.background = element_rect(fill = "linen"),
+          plot.title = element_text(face="bold", size=rel(1.5), hjust=0),
+          plot.subtitle = element_text(),
           panel.background = element_rect(fill = "linen"),
           axis.line = element_line(color = "black"),
+     )
+
+double_axis_theme <-   theme(
+    plot.background = element_rect(fill = "linen"),
+    plot.title = element_text(face="bold", 
+      size=rel(1.5), 
+      hjust=0
+      ),
+    plot.subtitle = element_text(color = "tomato"), 
+    panel.background = element_rect(fill = "linen"),  
+    axis.title.y.left = element_text(color = "blue"),
+    axis.title.y.right = element_text(color = "tomato"),
+    axis.text.y.right = element_text(color = "tomato"),
+    axis.line.x = element_line(color = "black"),
+    axis.line.y.left = element_line(color = "black"),
+    axis.line.y.right = element_line(color = "tomato")
+  ) 
+
+facet_theme <- theme(
+          plot.background = element_rect(fill = "linen"),
           plot.title = element_text(face="bold", size=rel(1.5), hjust=0),
-          plot.subtitle = element_text()
+          plot.subtitle = element_text(),
+          panel.background = element_rect(fill = "linen"),
+          panel.border = element_rect(
+            colour = "black",
+            fill = NA,
+            size = 1
+            ),
+          panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(),
+          strip.background = element_rect(fill = "linen"),
+          strip.text = element_text(color = "black"),
+          legend.position = "bottom"
      )
 ```
 
@@ -476,17 +491,8 @@ ggplot(data = state) +
   labs(x = "Date",
        y = "New Cases per Day") +
   ggtitle(label = "New York State - New Cases", subtitle = "Natural Scale") +
-  theme(
-    plot.background = element_rect(fill = "linen"),
-    panel.background = element_rect(fill = "linen"),
-    axis.line = element_line(color = "black"),
-    plot.title = element_text(
-      face = "bold",
-      size = rel(1.5),
-      hjust = 0
-    ),
-    plot.subtitle = element_text()
-  )
+  plot_theme
+  
 
 state1 <- state
 state1$SI[state1$SI == 0] <- 1
@@ -589,24 +595,14 @@ ggplot(data = state) +
        y = "New Cases per Day") +
   scale_y_log10(limits = c(1, 2000000), labels = comma) +
   ggtitle(label = "New York State - New Cases", subtitle = "Log Scale") +
-  theme(
-    plot.background = element_rect(fill = "linen"),
-    panel.background = element_rect(fill = "linen"),
-    axis.line = element_line(color = "black"),
-    plot.title = element_text(
-      face = "bold",
-      size = rel(1.5),
-      hjust = 0
-    ),
-    plot.subtitle = element_text()
-  )
+  plot_theme
 ```
 
 \pagebreak
 
 # Cummulative Cases
 
-<p class="intro">The total number of confirmed cases in New York State represents `r round(state$SC[state$t == max(state$t)]/193781, 1)`% of the population.>/p>
+<p class="intro">The total number of confirmed cases in New York State represents `r round(state$SC[state$t == max(state$t)]/193781, 1)`% of the population.</p>
 
 ```{r NYS Cummulative}
 ggplot(data = state) +
@@ -646,17 +642,7 @@ ggplot(data = state) +
              x = as.Date("2020-03-20"),
              y = 1) +
   ggtitle(label = "Cummulative: New York State New Cases", subtitle = "Log Scale") +
-  theme(
-    plot.background = element_rect(fill = "linen"),
-    panel.background = element_rect(fill = "linen"),
-    axis.line = element_line(color = "black"),
-    plot.title = element_text(
-      face = "bold",
-      size = rel(1.5),
-      hjust = 0
-    ),
-    plot.subtitle = element_text()
-  ) 
+  plot_theme
 ```
 
 \pagebreak
@@ -711,19 +697,9 @@ ggplot(data = state) +
              y = -5) +
   labs(x = "Date",
        y = "Percentage of Tests Performed that were Positive") +
+  double_axis_theme +
   ggtitle(label = "Precentage Positive: New York State New Tests", subtitle = "Number of Tests Performed") +
-  theme(
-    axis.title.y.left = element_text(color = "blue"),
-    axis.title.y.right = element_text(color = "tomato"),
-    axis.text.y.right = element_text(color = "tomato"),
-    panel.background = element_rect(fill = "linen"),
-    plot.background = element_rect(fill = "linen"),
-    axis.line.x = element_line(color = "black"),
-    axis.line.y.left = element_line(color = "black"),
-    axis.line.y.right = element_line(color = "tomato"),
-    plot.title = element_text(face="bold", size=rel(1.5), hjust=0),
-    plot.subtitle = element_text(color = "tomato")    
-  ) 
+
 ```
 \pagebreak
 
@@ -752,13 +728,7 @@ ggplot(data = NYDeaths) +
                  method = "gam") +
      labs(x = "Date",
           y = "Deaths") +
-     theme(
-          plot.background = element_rect(fill = "linen"),
-          panel.background = element_rect(fill = "linen"),
-          axis.line = element_line(color = "black"),
-          plot.title = element_text(face="bold", size=rel(1.5), hjust=0),
-          plot.subtitle = element_text()        
-     ) +
+     plot_theme +
      ggtitle(label = "Deaths per Day", subtitle = "Natural Scale")
 
 ggplot(data = NYDeaths) +
@@ -782,13 +752,7 @@ ggplot(data = NYDeaths) +
      ) +
      labs(x = "Date",
           y = "Deaths") +
-     theme(
-          plot.background = element_rect(fill = "linen"),
-          panel.background = element_rect(fill = "linen"),
-          axis.line = element_line(color = "black"),
-          plot.title = element_text(face="bold", size=rel(1.5), hjust=0),
-          plot.subtitle = element_text()
-     ) +
+     plot_theme +
      ggtitle(label = "Cummulative Deaths", subtitle = "Log Scale")
 ```
 
@@ -817,9 +781,7 @@ hist(R.sample)
 
 # Number of New Cases by County
 
-<p class="intro">I have divided the counties into three groups:  those that had more than 100 new cases on at least one day; those that had between 10 and 100 cases on one day; and those that had less than 10 cases on any day.</p>
-
-I only ran regressions on those counties with more than 100 cases on a day.
+<p class="intro">I have only run scatter plots and regression lines on those counties that had more than 100 new cases on at least one day. For the other counties, I have represented their data using heat maps and ridgeline plots.</p>
 
 As a reminder, New York City is divided into five boroughs, each borough being its own county.  Manhattan is New York County, the Bronx is Bronx County, Queens is Queens County, Brooklyn is Kings County, and Staten Island is Richmond County. 
 
@@ -911,22 +873,7 @@ ggplot(data = forNYS) +
           hjust=0
           ) +
      facet_wrap(vars(county), ncol = 4) +
-     theme(
-          plot.background = element_rect(fill = "linen"),
-          panel.background = element_rect(fill = "linen"),
-          strip.background = element_rect(fill = "grey80"),
-          strip.text = element_text(color = "black"),
-          legend.position = "bottom",
-          panel.border = element_rect(
-               colour = "black",
-               fill = NA,
-               size = 1
-          ),
-          panel.grid.major = element_blank(),
-          panel.grid.minor = element_blank(),
-          plot.title = element_text(face="bold", size=rel(1.5), hjust=0),
-          plot.subtitle = element_text()         
-     ) +
+     facet_theme +
      ggtitle(label="New Cases by County", subtitle = "Counties with a maximum of over 100 New Cases on a single day")
 ```
 
@@ -936,79 +883,57 @@ ggplot(data = forNYS) +
 
 
 ```{r County Slope Difference, fig.width=7.5, fig.height=7.5}
-#CSD %>%  kable()
-ggplot(CSD, aes(y=County, x = `EffectSize`, size = `SlopeDiff`, color = `SlopeDiff`)) +
-     geom_point() +
-     scale_color_viridis_c() + 
-     annotate(geom = "rect", 
-           xmin = c(0, 100000, 200000, 300000),
-           xmax = c(100000, 200000, 300000, 400000),
-           ymin = -Inf,
-           ymax = Inf,
-           fill = c(o_i_colors[2:5]),
-           alpha = 0.1) +
-     scale_x_continuous(labels = comma,
-                        limits = c(-300, 400000)) +
-     guides(color = guide_legend(title = "Difference in Slope"), 
-            size = guide_legend(title = "Difference in Slope")
-            ) +
-     labs(x="Effect Size",
-          y=NULL) +
-  ggtitle(label = "Social Distancing Effect Size by County", subtitle = "Counties with more than 100 cases in a day") +
-     theme(
-          panel.background = element_rect(fill = "linen"),
-          rect = element_rect(fill = "linen"),
-          plot.background = element_rect(fill = "linen"),
-          legend.background = element_rect(fill = "linen"),
-          panel.grid.minor = element_blank(),
-          plot.title = element_text(face="bold", size=rel(1.5), hjust=0),
-          plot.subtitle = element_text()        
-     )    
+ggplot(
+  CSD, 
+  aes(
+    y=fct_reorder(County, EffectSize), 
+    x = `EffectSize`, 
+    size = `SlopeDiff`, 
+    color = `SlopeDiff`)
+  ) + 
+geom_point() +
+scale_color_viridis_c() + 
+annotate(
+  geom = "rect", 
+  xmin = c(0, 100000, 200000, 300000),
+  xmax = c(100000, 200000, 300000, 400000),
+  ymin = -Inf,
+  ymax = Inf,
+  fill = 
+    c(o_i_colors[2:5]),
+    alpha = 0.1) +
+scale_x_continuous(
+  labels = comma,
+  limits = c(-300, 400000)) +
+guides(
+  color = guide_legend(title = "Difference in Slope"), 
+  size = guide_legend(title = "Difference in Slope")
+  ) +
+labs(
+  x="Effect Size",
+  y=NULL) +
+ggtitle(label = "Social Distancing Effect Size by County", subtitle = "Counties with more than 100 cases in a day") +
+plot_theme  
 ```
 
 # New Cases by County
 
-```{r County New 2,  fig.height=30, fig.width=20}
-ggplot(data = nysCounty2) +
-  geom_point(mapping = aes(x = t, y = I)) +
-  geom_point(data = filter(nysCounty2, t == max(t)),
-             mapping = aes(x = t, y = I),
-             color = "red") +
-  geom_rect(
-    aes(
-      xmin = as.Date("2020-03-20"),
-      xmax = as.Date("2020-04-03"),
-      ymin = 0,
-      ymax = Inf
-    ),
-    fill = "gray100",
-    alpha = 0.01
-  ) +  
+```{r County New 2,  fig.height=10, fig.width=20}
+ggplot(data = nys, 
+  aes(x=t, y=fct_reorder(county, I), fill = I)) +
+  geom_raster(show.legend = TRUE) + 
+  scale_fill_distiller(palette = "Spectral") +
+  scale_x_date(date_breaks = "weeks", date_labels = "%b-%d") + 
   labs(x = "Date",
-       y = "New Cases per Day") +
-  geom_vline(xintercept = as.Date("2020-03-20"), linetype = 4) +
- scale_y_continuous(breaks = seq(0, 100, by=20),
-                        limits = c(0, 100)) +  
-  geom_label_repel(
-    data = filter(nysCounty2, t == max(t)),
-    aes(
-      x = t,
-      y = I,
-      label = sprintf("%i", I),
-      fill="red"
-    ),
-    show.legend = FALSE,
-    segment.color = "black",
-    nudge_x = -10,
-    nudge_y = 5
-  ) +
-  facet_wrap( ~ county, ncol = 4) +
+       y = NULL) +  
+  guides(fill = guide_legend(title = "Cases")) +
   theme(
     plot.background = element_rect(fill = "linen"),
     panel.background = element_rect(fill = "linen"),
     strip.background = element_rect(fill = "grey80"),
     strip.text = element_text(color = "black"),
-    legend.position = "bottom",
+    legend.position = "right",
+    legend.background = element_rect(fill = "linen"),
     panel.border = element_rect(
       colour = "black",
       fill = NA,
@@ -1019,61 +944,62 @@ ggplot(data = nysCounty2) +
     plot.title = element_text(face="bold", size=rel(1.5), hjust=0),
     plot.subtitle = element_text()         
   ) +
-  ggtitle(label = "New Cases by County", subtitle= "Counties with a maximum of between 10 and 100 New Cases on a single day")
-```
+  ggtitle(label = "New Cases by County", subtitle= "Heat Map")
 
-```{r County New 3,  fig.height=20, fig.width=20}
-ggplot(data = nysCounty3) +
-     geom_point(mapping = aes(x = t, y = I)) +
-     geom_point(data = filter(nysCounty3, t == max(t)),
-             mapping = aes(x = t, y = I),
-             color = "red") +
-  geom_rect(
-    aes(
-      xmin = as.Date("2020-03-20"),
-      xmax = as.Date("2020-04-03"),
-      ymin = 0,
-      ymax = Inf
+ggplot(data = nys, 
+  aes(x=t, y=fct_reorder(county, I),  height = I, fill = I)) +
+  geom_ridgeline_gradient(show.legend = TRUE, scale = 0.005) + 
+  scale_fill_distiller(palette = "Spectral") +
+  labs(x = "Date",
+       y = NULL) +  
+  scale_x_date(date_breaks = "weeks", date_labels = "%b-%d") + 
+  guides(fill = guide_legend(title = "Cases")) +  
+  theme(
+    panel.background = element_rect(fill = "linen"),
+    panel.border = element_rect(
+      colour = "black",
+      fill = NA,
+      size = 1
     ),
-    fill = "gray100",
-    alpha = 0.01
-  ) +  
-     labs(x = "Date",
-          y = "New Cases per Day") +
-     scale_y_continuous(breaks = c(0, 2, 4, 6, 8, 10),
-                        limits = c(0, 10)) +
-     geom_vline(xintercept = as.Date("2020-03-20"), linetype = 4) +
-     geom_label_repel(
-          data = filter(nysCounty3, t == max(t)),
-          aes(
-               x = t,
-               y = I,
-               label = sprintf("%i", I),
-               fill="red"
-          ),
-          show.legend = FALSE,
-          segment.color = "black",
-          nudge_x = -10,
-          nudge_y = 2
-     ) +
-     facet_wrap(~ county, ncol = 4) +
-     theme(
-          plot.background = element_rect(fill = "linen"),
-          panel.background = element_rect(fill = "linen"),
-          strip.background = element_rect(fill = "grey80"),
-          strip.text = element_text(color = "black"),
-          legend.position = "bottom",
-          panel.border = element_rect(
-               colour = "black",
-               fill = NA,
-               size = 1
-          ),
-          panel.grid.major = element_blank(),
-          panel.grid.minor = element_blank(),
-          plot.title = element_text(face="bold", size=rel(1.5), hjust=0),
-          plot.subtitle = element_text()              
-     ) +
-     ggtitle(label = "New Cases by County", subtitle = "Counties with a maximum of less than 10 New Cases on a single day")
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    plot.background = element_rect(fill = "linen"),
+    plot.title = element_text(face="bold", size=rel(1.5), hjust=0),
+    plot.subtitle = element_text(),
+    strip.background = element_rect(fill = "grey80"),
+    strip.text = element_text(color = "black"),
+    legend.position = "right",
+    legend.background = element_rect(fill = "linen")
+  ) +
+  ggtitle(label = "New Cases by County", subtitle= "Ridgeline Plot")  
+
+nys %>%
+  filter(county %in% c('Bronx', 'New York', 'Westchester', 'Kings', 'Queens', 'Suffolk', 'Nasssau', 'Richmond', 'Erie', 'Orange', 'Richmond')) %>%
+ggplot(aes(x=t, y=fct_reorder(county, I),  height = I, fill = I)) +
+  geom_ridgeline_gradient(show.legend = TRUE, scale = 0.001) + 
+  scale_fill_distiller(palette = "Spectral") +
+  labs(x = "Date",
+       y = NULL) +  
+  scale_x_date(date_breaks = "weeks", date_labels = "%b-%d") + 
+  guides(fill = guide_legend(title = "Cases")) +
+  theme(
+    plot.background = element_rect(fill = "linen"),
+    panel.background = element_rect(fill = "linen"),
+    strip.background = element_rect(fill = "linen"),
+    strip.text = element_text(color = "black"),
+    legend.position = "right",
+    legend.background = element_rect(fill = "linen"),
+    panel.border = element_rect(
+      colour = "black",
+      fill = NA,
+      size = 1
+    ),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(face="bold", size=rel(1.5), hjust=0),
+    plot.subtitle = element_text()         
+  ) +
+  ggtitle(label = "New Cases by County - Top 10 Counties", subtitle= "Ridgeline Plot")  
 ```
 
 #  Cummulative Cases by County
@@ -1083,7 +1009,7 @@ nys %>%
   inner_join(NYpop, by=c("f" = "GEOID")) %>% 
   group_by(county) %>% 
   filter(t == max(t)) %>% 
-  ggplot(aes(x=C/estimate, y=county, size=estimate, color=estimate)) +
+  ggplot(aes(x=C/estimate, y=fct_reorder(county, C/estimate), size=estimate, color=estimate)) +
   geom_point() + 
   annotate(geom = "rect", 
            xmin = c(0, 0.01, .02, .03, .04),
@@ -1093,75 +1019,13 @@ nys %>%
            fill = c(o_i_colors[1:5]),
            alpha = 0.1) +
   scale_x_continuous(labels = percent) +
-  scale_y_discrete(limits = sort(nys$county, decreasing = TRUE))  +
   scale_size(labels = comma) + 
   scale_color_viridis_c(labels = comma) +
   labs(x = "Percentage of Population Infected", y=NULL) +
   guides(color = guide_legend(title = "Population"), 
          size = guide_legend(title = "Population")) +
   ggtitle(label = "Total Confirmed Cases by County", subtitle="Percent of Population") + 
-  theme(
-          plot.background = element_rect(fill = "linen"),
-          panel.background = element_rect(fill = "linen"),
-          strip.background = element_rect(fill = "linen"),
-          strip.text = element_text(color = "black"),
-          legend.background = element_rect(fill="linen"),
-          panel.grid.minor = element_blank(),
-          plot.title = element_text(face="bold", size=rel(1.5), hjust=0),
-          plot.subtitle = element_text()            
-     ) 
-
-#ggplot(data = nys) +
-#     geom_point(mapping = aes(x = t, y = C)) +
-#     geom_point(data = filter(nys, t == max(t)),
-##             mapping = aes(x = t, y = C),
-#             color = "red") +
-#  geom_rect(
-#    aes(
-#      xmin = as.Date("2020-03-20"),
-#      xmax = as.Date("2020-04-03"),
-#      ymin = 0,
-#      ymax = Inf
-#    ),
-#    fill = "gray100",
-#    alpha = 0.01
-#  ) +  
-#     geom_label_repel(
-#          data = filter(nys, t == max(t)),
-#          aes(
-#               x = t,
-#               y = C,
-#               label = sprintf("%i", C),
-#               fill="red"
-#          ),
-#          show.legend = FALSE,
-#          segment.color = "black",
-#          nudge_x = -10,
-#          nudge_y = -1
-#     ) +
-#     labs(x = "Date",
-#          y = "Log Scale of Cumulative Cases") +
-#     scale_y_log10(breaks = c(1, 10, 100, 1000, 10000)) +
-#     geom_vline(xintercept = as.Date("2020-03-20"), linetype = 4) +
-#     facet_wrap(~ county, ncol = 4) +
-#     ggtitle(label = "New Cases by County", subtitle="Cummulative") +
-#     theme(
-#          plot.background = element_rect(fill = "linen"),
-#          panel.background = element_rect(fill = "linen"),
-#          strip.background = element_rect(fill = "grey80"),
-#          strip.text = element_text(color = "black"),
-#          legend.position = "bottom",
-#          panel.border = element_rect(
-#               colour = "black",
-#               fill = NA,
-#               size = 1
-#          ),
-#          panel.grid.major = element_blank(),
-#          panel.grid.minor = element_blank(),
-#          plot.title = element_text(face="bold", size=rel(1.5), hjust=0),
-#          plot.subtitle = element_text()            
-#     ) 
-     
+plot_theme
 ```
 
 # Percentage of Tests performed that were Positive by County
@@ -1207,7 +1071,7 @@ ggplot(data = nys) +
      labs(x = "Date",
           y = "Percentage of Tests Performed that were Positive") +
      facet_wrap(~ county, ncol = 4) +
-     ggtitle(label = "Percentag Positive by County", subtitle = "Number of Tests Performed") +
+     ggtitle(label = "Percentage Positive by County", subtitle = "Number of Tests Performed") +
      theme(
           plot.background = element_rect(fill = "linen"),
           panel.background = element_rect(fill = "linen"),
@@ -1233,139 +1097,68 @@ ggplot(data = nys) +
 
 <p class="intro">New York City deaths are combined from New York, Bronx, Kings, Queens and Richmond counties.</p>
 
-```{r County Deaths 1, fig.height=5, fig.width=20}
-ggplot(data = NYCountyDeaths1) +
-     geom_point(mapping = aes(x = date, y = d)) +
-     geom_point(data = filter(NYCountyDeaths1, date == max(date)),
-             mapping = aes(x = date, y = d),
-             color = "red") +
-     geom_label_repel(
-          data = filter(NYCountyDeaths1, date == max(date)),
-          aes(
-               x = date,
-               y = d,
-               label = sprintf("%i", d),
-               fill="red"
-          ),
-          show.legend = FALSE,
-          segment.color = "black",
-          nudge_x = -10,
-          nudge_y = 10
-     ) +
-     labs(x = "Date",
-          y = "Deaths") +
-     ylim(0, 1000) +
-     facet_wrap( ~ county, ncol = 4) +
-     theme(
-          plot.background = element_rect(fill = "linen"),
-          panel.background = element_rect(fill = "linen"),
-          strip.background = element_rect(fill = "grey80"),
-          strip.text = element_text(color = "black"),
-          legend.position = "bottom",
-          panel.border = element_rect(
-               colour = "black",
-               fill = NA,
-               size = 1
-          ),
-          panel.grid.major = element_blank(),
-          panel.grid.minor = element_blank(),
-          plot.title = element_text(face="bold", size=rel(1.5), hjust=0),
-          plot.subtitle = element_text()     
-     ) +
-     ggtitle(label = "Deaths by County", subtitle="Counties with a maximum of over 100 deaths on a single day")
-```
+```{r County Deaths 1, fig.height=10, fig.width=20}
+ggplot(data = NYCountyDeaths, 
+  aes(x=date, y=fct_reorder(county, d), fill = d)) +
+  geom_raster(show.legend = TRUE) + 
+  scale_fill_distiller(palette = "Spectral") +
+  scale_x_date(date_breaks = "weeks", date_labels = "%b-%d") + 
+  labs(x = "Date",
+       y = NULL) +  
+  guides(fill = guide_legend(title = "Deaths")) +  
+  theme(
+    plot.background = element_rect(fill = "linen"),
+    panel.background = element_rect(fill = "linen"),
+    strip.background = element_rect(fill = "linen"),
+    legend.background = element_rect(fill = "linen"),    
+    strip.text = element_text(color = "black"),
+    legend.position = "right",
+    panel.border = element_rect(
+      colour = "black",
+      fill = NA,
+      size = 1
+    ),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(face="bold", size=rel(1.5), hjust=0),
+    plot.subtitle = element_text()         
+  ) +
+  ggtitle(label = "Deaths by County", subtitle= "Heat Map")
 
-```{r County Deaths 2, fig.height=10, fig.width=20}
-ggplot(data = NYCountyDeaths2) +
-     geom_point(mapping = aes(x = date, y = d)) +
-     geom_point(data = filter(NYCountyDeaths2, date == max(date)),
-             mapping = aes(x = date, y = d),
-             color = "red") +
-     geom_label_repel(
-          data = filter(NYCountyDeaths2, date == max(date)),
-          aes(
-               x = date,
-               y = d,
-               label = sprintf("%i", d),
-               fill="red"
-          ),
-          show.legend = FALSE,
-          segment.color = "black",
-          nudge_x = -10,
-          nudge_y = 2
-     ) +
-     labs(x = "Date",
-          y = "Deaths") +
-     ylim(0, 100) +
-     facet_wrap( ~ county, ncol = 4) +
-     theme(
-          plot.background = element_rect(fill = "linen"),
-          panel.background = element_rect(fill = "linen"),
-          strip.background = element_rect(fill = "grey80"),
-          strip.text = element_text(color = "black"),
-          legend.position = "bottom",
-          panel.border = element_rect(
-               colour = "black",
-               fill = NA,
-               size = 1
-          ),
-          panel.grid.major = element_blank(),
-          panel.grid.minor = element_blank(),
-          plot.title = element_text(face="bold", size=rel(1.5), hjust=0),
-          plot.subtitle = element_text()             
-     ) +
-     ggtitle(label = "Death by County", subtitle="Counties with a maximum between 10 and 100 deaths on a single day")
+ggplot(data = NYCountyDeaths, 
+  aes(x=date, y=fct_reorder(county, d),  height = d, fill = d)) +
+  geom_ridgeline_gradient(show.legend = TRUE, scale = 0.01) + 
+  scale_fill_distiller(palette = "Spectral") +
+  scale_x_date(date_breaks = "weeks", date_labels = "%b-%d") + 
+  labs(x = "Date",
+       y = NULL) +  
+  guides(fill = guide_legend(title = "Deaths")) +  
+  theme(
+    plot.background = element_rect(fill = "linen"),
+    panel.background = element_rect(fill = "linen"),
+    legend.background = element_rect(fill = "linen"),
+    strip.background = element_rect(fill = "linen"),
+    strip.text = element_text(color = "black"),
+    legend.position = "right",
+    panel.border = element_rect(
+      colour = "black",
+      fill = NA,
+      size = 1
+    ),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(face="bold", size=rel(1.5), hjust=0),
+    plot.subtitle = element_text()         
+  ) +
+  ggtitle(label = "Deaths by County", subtitle= "Ridgeline Plot")  
 ```
-
-```{r County Deaths 3, fig.height=30, fig.width=20}
-ggplot(data = NYCountyDeaths3) +
-     geom_point(mapping = aes(x = date, y = d)) +
-     geom_point(data = filter(NYCountyDeaths3, date == max(date)),
-             mapping = aes(x = date, y = d),
-             color = "red") +
-     labs(x = "Date",
-          y = "Deaths") +
-     scale_y_continuous(breaks = c(0, 2, 4, 6, 8, 10),
-                        limits = c(0, 10)) +
-     geom_label_repel(
-          data = filter(NYCountyDeaths3, date == max(date)),
-          aes(
-               x = date,
-               y = d,
-               label = sprintf("%i", d),
-               fill="red"
-          ),
-          show.legend = FALSE,
-          segment.color = "black",
-          nudge_x = -10,
-          nudge_y = 2
-     ) +
-     facet_wrap( ~ county, ncol = 4) +
-     theme(
-          plot.background = element_rect(fill = "linen"),
-          panel.background = element_rect(fill = "linen"),
-          strip.background = element_rect(fill = "linen"),
-          strip.text = element_text(color = "black"),
-          legend.position = "bottom",
-          panel.border = element_rect(
-               colour = "black",
-               fill = NA,
-               size = 1
-          ),
-          panel.grid.major = element_blank(),
-          panel.grid.minor = element_blank(),
-          plot.title = element_text(face="bold", size=rel(1.5), hjust=0),
-          plot.subtitle = element_text()            
-     ) +
-     ggtitle(label="Deaths by County", subtitle = "Counties with a maximum of 10 or fewer deaths on a single day")
-```     
 
 # Estimation of R<sub>t</sub> in New York State by County
 
 <p class="intro">Counties with fewer than 11 cases per week, on average, do not have enough data to accurately estimate R<sub>t</sub>.  For those counties, R<sub>t</sub> and the 95% Confidence Interval are listed as NA.  On the map, they are left blank.</p>
 
 ```{r Counties R, fig.width=7.5, fig.height=10}
-ggplot(ny_map4, aes(y=County, x = R, size = Population, color = Population)) +
+ggplot(ny_map4, aes(y=fct_reorder(County, R), x = R, size = Population, color = Population)) +
      geom_point() +  
      geom_pointrange(aes(xmin = Confl, 
                          xmax = Confh)) +
@@ -1385,7 +1178,6 @@ ggplot(ny_map4, aes(y=County, x = R, size = Population, color = Population)) +
      labs(x = bquote(R[t]), y=NULL) +
      guides(color = guide_legend(), 
             size = guide_legend()) +
-     scale_y_discrete(limits = sort(ny_map4$County, decreasing = TRUE))  +
      ggtitle(label= bquote(R[t]), subtitle = "Estimation by County") +
      theme(
           rect = element_rect(fill = "linen"),
@@ -1414,6 +1206,7 @@ ggplot(data = ny_map3) +
      theme(
           rect = element_rect(fill = "linen"),
           plot.background = element_rect(fill = "linen"),
+          panel.background = element_rect(fill = "linen"),
           legend.background = element_rect(fill = "linen"),
           axis.title = element_blank(),
           axis.text = element_blank(),
@@ -1428,7 +1221,7 @@ ggplot(data = ny_map3) +
 # Estimation of R<sub>t</sub> in the United States by State
 
 ```{r States R, fig.width=7.8, fig.height=10}
-ggplot(us_map4, aes(y=State, x = R, size = Population, color = Population)) +
+ggplot(us_map4, aes(y=fct_reorder(State, R), x = R, size = Population, color = Population)) +
      geom_point() + 
      geom_pointrange(aes(xmin = Confl, 
                          xmax = Confh)) +
@@ -1448,7 +1241,6 @@ ggplot(us_map4, aes(y=State, x = R, size = Population, color = Population)) +
      labs(x= bquote(R[t]), y=NULL) +
      guides(color = guide_legend(), 
             size = guide_legend()) +
-     scale_y_discrete(limits = sort(us_map4$State, decreasing = TRUE)) +
      ggtitle(label = bquote(R[t]), subtitle = "Estimate by State") +
      theme(
           panel.background = element_rect(fill = "linen"),
@@ -1477,6 +1269,7 @@ ggplot(data = us_map48) +
      theme(
           rect = element_rect(fill = "linen"),
           plot.background = element_rect(fill = "linen"),
+          panel.background = element_rect(fill = "linen"),
           legend.background = element_rect(fill = "linen"),
           axis.title = element_blank(),
           axis.text = element_blank(),
