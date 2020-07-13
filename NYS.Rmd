@@ -310,10 +310,12 @@ CSD <- CSD %>%
           "SlopeBefore" = round(b, 3),
           "SlopeAfter" = round(a, 3),
           "SlopeDiff" = round(d, 3),
-          "EffectSize" = round(g, 0)
+          "EffectSize" = round(g, 0),
+          "countyFIPS" = fips("NY", county = County)
      ) %>%
      select(
           County,
+          "countyFIPS",
           "SlopeBefore",
           "SlopeAfter",
           "SlopeDiff",
@@ -450,9 +452,9 @@ The first set of graphs represent new cases of COVID-19 for the state of New Yor
 
 Because of the latency from time of infection to symptoms, and then to diagnosis, it may take up to 14 days after a change in policy for the number of new cases to decrease.  I have indicated this two week period after the policy of social distancing enforcement with gray dots.  Regression lines before and after the policy omit that two week period. 
 
-The effect of an intervention can be measured in two ways.  The first, and most intuitive, is to produce two regression lines based on the data before the intervention, and after the intervention.  The first regression line represents the rate of infection before any intervention.  We can extend that line through the two week intervention period, and estimate the number of infections that would have been expected if no intervention had taken place.  Then we can measure the distance from that counterfactual predicted value to the actual number of infections based on the regression line after the intervention.  This gives an estimation of the difference between what the number of infections might have been without an intervention, and the actual number with an intervention - that is, the effect size of the intervention.  A second, more abstract, way is to compare the slopes of the two regression lines.  Although this is a measurement of the intervention, it is not intuitively clear what that change in slope represents.
+The effect size of interventions such as sheltering at home, social distancing, and wearing masks can be measured in two ways.  The first, and most intuitive, is to produce two regression lines based on the data before the interventions, and after the interventions.  The first regression line represents the rate of infection before any interventions were made.  We can extend that line through the two week intervention period, and estimate the number of infections that would have been expected if no interventions had taken place.  Then we can measure the distance from that counterfactual predicted value to the factual number of infections based on the data after the intervention.  This gives an estimation of the difference between what the number of infections might have been without an intervention, and the actual number with an intervention - that is, the effect size of the intervention.  A second, more abstract, way is to compare the slopes of the two regression lines.  Although this is a measurement of the intervention, it is not intuitively clear what that change in slope represents.
 
-These charts are for demonstration purposes only.  The regression lines are drawn using simple linear regression, rather than an ARIMA model, which is more appropriate for time series.  In addition, there may be other factors beside the social distancing intervention that may have influenced the change in regression lines during this period.  For example, the natural history of infections may have an increasing phase and decreasing phase without any intervention. However, the fact that we see a marked change at the precise time that social distancing was enforced is strong evidence that it was that intervention that caused the change.
+These charts are for demonstration purposes only.  The regression lines are drawn using simple linear regression, rather than an ARIMA model, which is more appropriate for time series.  In addition, there may be other factors beside the social distancing intervention that may have influenced the change in regression lines during this period.  For example, the natural history of infections may have an increasing phase and decreasing phase without any intervention. However, the fact that we see a marked change at the precise time that social distancing was enforced is strong evidence that it was that intervention which caused the change.
 
 The most recent measurement on each graph is labeled in red.
 
@@ -882,41 +884,82 @@ ggplot(data = forNYS) +
 
 # Effect Size
 
-<p class="intro">Note that greatest change in the Effect Size and the slope of the regession lines is in the largest and heaviest hit counties.</p>
+<p class="intro">The Effect Size is the estimated number of lives saved by actions such as sheltering at home, social distancing, and wearing masks.  Note that the greatest changes in the Effect Size are in the largest and heaviest hit counties.</p>
 
 
 ```{r County Slope Difference, fig.width=7.5, fig.height=7.5}
-ggplot(
-  CSD, 
+CSD %>%
+  inner_join(NYpop, by = c("countyFIPS" = "GEOID")) %>% 
+  ggplot(
   aes(
-    y=fct_reorder(County, EffectSize), 
-    x = `EffectSize`, 
-    size = `SlopeDiff`, 
-    color = `SlopeDiff`)
+    y=fct_reorder(County, EffectSize/estimate), 
+    x = EffectSize/estimate, 
+    size = estimate, 
+    color = estimate)
   ) + 
 geom_point() +
-scale_color_viridis_c() + 
 annotate(
   geom = "rect", 
-  xmin = c(0, 100000, 200000, 300000),
-  xmax = c(100000, 200000, 300000, 400000),
+  xmin = c(0, 0.05, .1, .15),
+  xmax = c(0.05, .1, .15, .2),
   ymin = -Inf,
   ymax = Inf,
-  fill = 
-    c(o_i_colors[2:5]),
-    alpha = 0.1) +
+  fill = c(o_i_colors[1:4]),
+  alpha = 0.1) +
+scale_color_viridis_c() + 
 scale_x_continuous(
-  labels = comma,
-  limits = c(-300, 400000)) +
+  labels = percent,
+  limits = c(0, 0.2)) +
 guides(
-  color = guide_legend(title = "Difference in Slope"), 
-  size = guide_legend(title = "Difference in Slope")
+  color = guide_legend(title = "Population"), 
+  size = guide_legend(title = "Population")
   ) +
 labs(
-  x="Effect Size",
+  x="Effect Size as percent of Population",
   y=NULL) +
 ggtitle(label = "Social Distancing Effect Size by County", subtitle = "Counties with more than 100 cases in a day") +
 plot_theme  
+```
+
+<p class="intro">However, even though the relation between Effect size and Population Size does appear linear, there is a large amount of variance that has not  been explained.</p>
+
+```{r Effect Size vs. Population, fig.width=7.5, fig.height=5}
+data1 <- CSD %>%
+  inner_join(NYpop, by = c("countyFIPS" = "GEOID"))
+
+data2 <- CSD %>%
+  inner_join(NYpop, by = c("countyFIPS" = "GEOID")) %>%
+  filter(estimate > 1000000)
+
+ggplot(
+    data1,
+    aes(
+      y = EffectSize, 
+      x = estimate)
+    ) + 
+  geom_point() +
+  geom_smooth(method = lm) +
+  geom_label_repel(
+    data = data2,
+    mapping = aes(
+      y = EffectSize,
+      x = estimate,
+      label = County
+    ),
+    show.legend = FALSE,
+    segment.color = "black"
+  ) +
+  scale_x_continuous(
+    labels = comma,
+    limits = c(0, 3000000)) +
+  scale_y_continuous(
+    labels = comma,
+    limits = c(0, 350000)) +
+  labs(
+    x="Population",
+    y="Estimated Number of Lives Saved"
+    )+
+  plot_theme
 ```
 
 # New Cases by County
