@@ -1,4 +1,3 @@
-
 html {
     font-size: 14px;
 }
@@ -7,9 +6,8 @@ body {
     margin-left: 10px;
     margin-right: 10Px;
     max-width: 90%;
-    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-    background-color: Linen;
-    color: #111;
+    font-family: "Palatino Linotype";
+    background-color: linen;
     counter-reset: footnotes;
 }
 
@@ -18,12 +16,15 @@ body {
     text-align: center;
 }
 
-
+div {
+    background-color: inherit;
+}
 
 h1 {
     margin-top: 100px;
     margin-bottom: 20px;
     margin-left: 0;
+    text-align: right;
     font-weight: 700;
     font-family: "Palatino Linotype";
     line-height: 1; 
@@ -32,6 +33,7 @@ h1 {
 h2 {
     font-weight: 600;
     margin-left: 0;
+    text-align: right;
     font-family: "Palatino Linotype";
     line-height: 1;
     counter-reset: section3;
@@ -47,6 +49,7 @@ h3 {
     margin-top: 1.7rem;
     margin-bottom: 1.4rem;
     margin-left: 0;
+    text-align: left;
     line-height: 1;
     counter-reset: section4;
 }
@@ -104,17 +107,18 @@ ol {
 
 #math {
     margin-left: 10px;
+    background-color: inherit;
 }
 
 p:not(#math) {
     margin-left: 0;
     font-size: 16px;
+    background-color: inherit;
 }
 
-p::first-letter {
-    font-size: xx-large;
+p.intro::first-letter {
+    font-size: 1.5em;
     font-style: italic;
-    font-weight: bold;
 }
 
 #note {
@@ -146,9 +150,9 @@ pre:not(.r) {
 }
 
 img {
-    margin-left: 50px;
     max-width: 100%;
     height: auto;
+    background-color: inherit;
 }
 
 table {
@@ -249,7 +253,7 @@ footer :target {
     display: flex;
     padding: 60px;
     text-align: center;
-    background: linen;
+    background: inherit;
 }
 
 .row {  
@@ -260,7 +264,7 @@ footer :target {
 .side {
     flex: 50px;
     position: fixed;    
-    background: linen none repeat scroll 0 0;
+    background: inherit none repeat scroll 0 0;
     font-size: 95%;
     text-align: left;
     top: 0;
@@ -274,7 +278,7 @@ footer :target {
 
 .main {
   flex: auto;
-  background-color: linen;
+  background-color: inherit;
   padding: 0;
 }
 
@@ -284,7 +288,7 @@ footer :target {
     clear: right;
     margin-top: 0;
     margin-bottom: 0;
-    background-color: linen;
+    background-color: inherit;
 }
 
 .date{
@@ -293,8 +297,8 @@ footer :target {
     clear: right;
     margin-top: 0;
     margin-bottom: 0;
-    background-color: linen;
+    background-color: inherit;
 }
 */
 
-.RdYlBu .q0-5{fill:rgb(215,25,28)} .RdYlBu .q1-5{fill:rgb(253,174,97)} .RdYlBu .q2-5{fill:rgb(255,255,191)} .RdYlBu .q3-5{fill:rgb(171,217,233)} .RdYlBu .q4-5{fill:rgb(44,123,182)}
+

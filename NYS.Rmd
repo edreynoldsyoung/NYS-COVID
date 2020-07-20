@@ -443,6 +443,20 @@ facet_theme <- theme(
           strip.text = element_text(color = "black"),
           legend.position = "bottom"
      )
+
+map_theme <- theme(
+          rect = element_rect(fill = "linen"),
+          plot.background = element_rect(fill = "linen", color = "linen"),
+          panel.background = element_rect(fill = "linen", color = "linen"),
+          legend.background = element_rect(fill = "linen"),
+          axis.title = element_blank(),
+          axis.text = element_blank(),
+          axis.ticks = element_blank(),
+          panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(),
+          plot.title = element_text(face="bold", size=rel(1.5), hjust=0),
+          plot.subtitle = element_text()    
+     )   
 ```
 
 
@@ -1249,19 +1263,7 @@ ggplot(data = ny_map3) +
      geom_sf_text(aes(label = County, geometry=geometry)) +
      ylim(40, 46) +
      ggtitle(label = bquote(R[t]), subtitle="Estimation by County") +
-     theme(
-          rect = element_rect(fill = "linen"),
-          plot.background = element_rect(fill = "linen"),
-          panel.background = element_rect(fill = "linen"),
-          legend.background = element_rect(fill = "linen"),
-          axis.title = element_blank(),
-          axis.text = element_blank(),
-          axis.ticks = element_blank(),
-          panel.grid.major = element_blank(),
-          panel.grid.minor = element_blank(),
-          plot.title = element_text(face="bold", size=rel(1.5), hjust=0),
-          plot.subtitle = element_text()     
-     )   
+     map_theme
 ```
 
 # Estimation of R<sub>t</sub> in the United States by State
@@ -1302,7 +1304,7 @@ ggplot(us_map4, aes(y=fct_reorder(State, R), x = R, size = Population, color = P
 
 # Map of R<sub>t</sub> in the United States
 
-```{r US Map R, fig.width= 20, fig.height=8.4}
+```{r US Map R, fig.width= 18.7, fig.height=8.4}
 ggplot(data = us_map48) +
      geom_sf(aes(fill = R, 
                  geometry = geometry)) +
@@ -1311,20 +1313,9 @@ ggplot(data = us_map48) +
        colours = o_i_colors[2:8] ) +
      geom_sf_text(aes(label = STUSPS, geometry=geometry)) +
      labs(fill = bquote(R[t])) +
-     ggtitle(label =  bquote(R[t]), subtitle = "Estimation by State") +
-     theme(
-          rect = element_rect(fill = "linen"),
-          plot.background = element_rect(fill = "linen"),
-          panel.background = element_rect(fill = "linen"),
-          legend.background = element_rect(fill = "linen"),
-          axis.title = element_blank(),
-          axis.text = element_blank(),
-          axis.ticks = element_blank(),
-          panel.grid.major = element_blank(),
-          panel.grid.minor = element_blank(),
-          plot.title = element_text(face="bold", size=rel(1.5), hjust=0),
-          plot.subtitle = element_text()    
-     )     
+     ggtitle(label =  bquote(R[t]), subtitle = "Estimation by State") + 
+     map_theme +
+     coord_sf()
 ```
 
 \pagebreak
