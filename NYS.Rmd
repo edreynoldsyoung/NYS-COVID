@@ -291,14 +291,17 @@ for (c in unique(forNYS$county)) {
           lm(log10(I) ~ t, data = filter(forNYS, t <= as.Date("2020-03-20") &
                                               county == c), na.action=na.omit)
      y <-
-          lm(log10(I) ~ t, data = filter(forNYS, t >= as.Date("2020-04-03") &
+          lm(log10(I) ~ t, data = filter(forNYS, t >= as.Date("2020-04-03") & t <= as.Date("2020-06-01") &
+                                              county == c), na.action=na.omit)
+     y2 <- lm(log10(I) ~ t, data = filter(forNYS, t >= as.Date("2020-06-01") &
                                               county == c), na.action=na.omit)
      z <-
           10 ^ (predict(x, data.frame(t = as.Date("2020-04-03")))) - 10 ^ y$fitted.values[1]
-     CSD$b[CSD$County == c] <- x$coefficients[2]
-     CSD$a[CSD$County == c] <- y$coefficients[2]
-     CSD$d[CSD$County == c] <- x$coefficients[2] - y$coefficients[2]
+     CSD$b[CSD$County == c] <- 10^x$coefficients[2]
+     CSD$a[CSD$County == c] <- 10^y$coefficients[2]
+     CSD$d[CSD$County == c] <- 10^(x$coefficients[2] - y$coefficients[2])
      CSD$g[CSD$County == c] <- z
+     CSD$h[CSD$County == c] <- 10^y2$coefficients[2]
      CSD$y_int1[CSD$County == c] <- 10^tail(x$fitted.values, 1)
      CSD$y_int2[CSD$County == c] <- 10^(tail(x$fitted.values, 1)+14*x$coefficients[2])
      CSD$y_int3[CSD$County == c] <- 10^y$model$`log10(I)`[1]
@@ -311,6 +314,7 @@ CSD <- CSD %>%
           "SlopeAfter" = round(a, 3),
           "SlopeDiff" = round(d, 3),
           "EffectSize" = round(g, 0),
+          "SlopeOpen" = round(h, 3),
           "countyFIPS" = fips("NY", county = County)
      ) %>%
      select(
@@ -320,6 +324,7 @@ CSD <- CSD %>%
           "SlopeAfter",
           "SlopeDiff",
           "EffectSize",
+          "SlopeOpen",
           y_int1,
           y_int2,
           y_int3
@@ -518,8 +523,10 @@ state1 <- state
 state1$SI[state1$SI == 0] <- 1
 before <-
   lm(log10(SI) ~ t, data = filter(state1, t <= as.Date("2020-03-20")))
-after <-
-  lm(log10(SI) ~ t, data = filter(state, t >= as.Date("2020-04-03")))
+after1 <-
+  lm(log10(SI) ~ t, data = filter(state, t >= as.Date("2020-04-03") & t<= as.Date("2020-06-01")))
+after2 <-
+  lm(log10(SI) ~ t, data = filter(state, t> as.Date("2020-06-01")))
 ggplot(data = state) +
   geom_point(mapping = aes(x = t, y = SI)) +
   geom_point(data = filter(state, t == max(t)),
@@ -534,9 +541,17 @@ ggplot(data = state) +
     se = FALSE
   ) +
   geom_smooth(
-    data = filter(state, t >= as.Date("2020-04-03")),
+    data = filter(state, t >= as.Date("2020-04-03") & t<=as.Date("2020-06-01")),
     mapping = aes(x = t, y = SI),
     colour = "green",
+    method = lm,
+    na.rm = TRUE,
+    se = FALSE
+  ) +
+  geom_smooth(
+    data = filter(state, t>=as.Date("2020-06-01")),
+    mapping = aes(x = t, y = SI),
+    colour = "yellow",
     method = lm,
     na.rm = TRUE,
     se = FALSE
@@ -557,7 +572,7 @@ ggplot(data = state) +
       x    = as.Date("2020-04-03"),
       y    = 10 ^ (before$model$`log10(SI)`[18] + 14 * before$coefficients[2]),
       xend = as.Date("2020-04-03"),
-      yend = 10 ^ after$model$`log10(SI)`[1]
+      yend = 10 ^ after1$model$`log10(SI)`[1]
     ),
     linetype = 2,
     color = "black",
@@ -590,27 +605,43 @@ ggplot(data = state) +
   geom_label(label = "Social Distancing Enforced",
              x = as.Date("2020-03-20"),
              y = 0) +
+  geom_vline(xintercept = as.Date("2020-06-01"), linetype = 4) +
+  geom_label(label = "Opening Begins",
+             x = as.Date("2020-06-01"),
+             y = 0) +
   geom_text(
     aes(
       label = sprintf(
-      "Difference in Slope = %.3f",
-      before$coefficients[2] - after$coefficients[2]
-    ),
-    x = as.Date("2020-04-15"),
-    y = 50000
-  ), hjust=0
+              "Difference in Slope = %.3f",
+              before$coefficients[2] - after1$coefficients[2]
+              ),
+      x = as.Date("2020-04-05"),
+      y = 50000
+    ), 
+    hjust=0
   ) +
   geom_text(
     aes(
       label = sprintf(
         "Effect Size = %.0f",
         10 ^ (before$model$`log10(SI)`[18] + 14 * before$coefficients[2]) - 10 ^
-        after$model$`log10(SI)`[1]
+        after1$model$`log10(SI)`[1]
       ),
-    x = as.Date("2020-04-15"),
+    x = as.Date("2020-04-05"),
     y = 100000
     ), hjust=0
     ) +
+  geom_text(
+    aes(
+      label = sprintf(
+              "Slope = %.3f",
+              after2$coefficients[2]
+              ),
+      x = as.Date("2020-06-03"),
+      y = 100000
+    ), 
+    hjust=0
+  ) +  
   labs(x = "Date",
        y = "New Cases per Day") +
   scale_y_log10(limits = c(1, 2000000), labels = comma) +
@@ -824,6 +855,7 @@ ggplot(data = forNYS) +
           y = "New Cases per Day") +
      scale_y_log10(labels = comma) +
      geom_vline(xintercept = as.Date("2020-03-20"), linetype = 4) +
+     geom_vline(xintercept = as.Date("2020-06-01"), linetype = 4) + 
      geom_label_repel(
           data = filter(forNYS, t == max(t)),
           aes(
@@ -846,9 +878,17 @@ ggplot(data = forNYS) +
           se = FALSE
      ) +
      geom_smooth(
-          data = filter(forNYS, t >= as.Date("2020-04-03")),
+          data = filter(forNYS, t >= as.Date("2020-04-03") & t <= as.Date("2020-06-01")),
           mapping = aes(x = t, y = I),
           colour = "green",
+          method = lm,
+          na.rm = TRUE,
+          se = FALSE
+     ) +
+     geom_smooth(
+          data = filter(forNYS, t >= as.Date("2020-06-01")),
+          mapping = aes(x = t, y = I),
+          colour = "yellow",
           method = lm,
           na.rm = TRUE,
           se = FALSE
@@ -878,7 +918,7 @@ ggplot(data = forNYS) +
      geom_text(
           aes(
                label = sprintf("Effect Size is %.0f", EffectSize),
-               x = as.Date("2020-04-20"),
+               x = as.Date("2020-04-05"),
                y = 100000
                ),
           hjust=0
@@ -886,11 +926,19 @@ ggplot(data = forNYS) +
      geom_text(
           aes(
                label = sprintf("Difference in Slope is %.3f", SlopeDiff),
-               x = as.Date("2020-04-20"),
+               x = as.Date("2020-04-05"),
                y = 50000
                ),
           hjust=0
           ) +
+     geom_text(
+          aes(
+               label = sprintf("Slope is %.3f", SlopeOpen),
+               x = as.Date("2020-06-05"),
+               y = 100000
+               ),
+          hjust=0
+          ) +  
      facet_wrap(vars(county), ncol = 4) +
      facet_theme +
      ggtitle(label="New Cases by County", subtitle = "Counties with a maximum of over 100 New Cases on a single day")
