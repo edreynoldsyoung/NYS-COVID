@@ -4,7 +4,7 @@ author: "Ed Young"
 date:  '`r format(Sys.Date(), "%B %d, %Y")`'
 output:
   html_document:
-    css: ~/repos/styles.css
+    css: styles.css
     highlight: null
     theme: null
   df_print: kable
@@ -19,58 +19,63 @@ knitr::opts_chunk$set(
      message = FALSE,
      cache = FALSE
 )
+
+## required install on system (sudo apt install ...):  libgdal-dev, libudunits2-dev
+## Census API Key is required:  http://api.census.gov/data/key_signup.html
+## Once acquired, the Census API Key should be included in #HOME/.Renviron file
+## First line in file should be:  CENSUS_API_KEY = 'ID'
 check_load_pkgs <- function() {
      if (!require(tidyverse)) {
           message("installing the 'tidyverse' package")
-          install.packages(tidyverse)
+          install.packages("tidyverse")
      }
      if (!require(ggrepel)) {
           message("installing the 'ggrepel' package")
-          install.packages(ggrepel)
+          install.packages("ggrepel")
      }
      if (!require(lubridate)) {
           message("installing the 'lubridate' package")
-          install.packages(lubridate)
+          install.packages("lubridate")
      }
      if (!require(EpiEstim)) {
           message("installing the 'EpiEstim' package")
-          install.packages(EpiEstim)
+          install.packages("EpiEstim")
      }
      if (!require(RSocrata)) {
           message("installing the 'RSocrata' package")
-          install.packages(RSocrata)
+          install.packages("RSocrata")
      }
      if (!require(knitr)) {
           message("installing the 'knitr' package")
-          install.packages(knitr)
+          install.packages("knitr")
      }
      if (!require(sf)) {
           message("installing the 'sf' package")
-          install.packages(sf)
+          install.packages("sf")
      }
      if (!require(tigris)) {
           message("installing the 'tigris' package")
-          install.packages(tigris)
+          install.packages("tigris")
      }
      if (!require(usmap)) {
           message("installing the 'usmap' package")
-          install.packages(usmap)
+          install.packages("usmap")
      }
      if (!require(tidycensus)) {
           message("installing the 'tidycensus' package")
-          install.packages(tidycensus)
+          install.packages("tidycensus")
      }
      if (!require(scales)) {
           message("installing the 'scales' package")
-          install.packages(scales)
+          install.packages("scales")
      }
      if (!require(viridis)) {
           message("installing the 'viridis' package")
-          install.packages(viridis)
+          install.packages("viridis")
      }
      if (!require(ggridges)) {
           message("installing the 'ggridges' package")
-          install.packages(ggridges)
+          install.packages("ggridges")
      }  
 }
 check_load_pkgs()
