@@ -20,7 +20,7 @@ knitr::opts_chunk$set(
      cache = FALSE
 )
 
-## required install on system (sudo apt install ...):  libgdal-dev, libudunits2-dev
+## required install on system (sudo apt install ...):  libgdal-dev, libudunits2-dev, libcurl4-openssl-dev
 ## Census API Key is required:  http://api.census.gov/data/key_signup.html
 ## Once acquired, the Census API Key should be included in #HOME/.Renviron file
 ## First line in file should be:  CENSUS_API_KEY = 'ID'
@@ -92,6 +92,7 @@ nys <-
             C = cumulative_number_of_positives,
             T = total_number_of_tests,
             county) %>%
+     filter(!county %in% c("Capital Region", "Central New York", "Finger Lakes", "Long Island", "Mid-Hudson", "Mohawk Valley", "New York City", "North Country", "Out-of-State", "STATEWIDE", "Southern Tier", "Western New York")) %>%
      mutate(
           t = as.Date(t),
           I = as.integer(I),
@@ -275,67 +276,70 @@ ROutput.US <- makeRoutput(Cases2, 7)
 # from the regression line after the intervention at the same point after the
 # intervention.
 
-forNYS <- nys %>%
+ forNYS <- nys %>%
      group_by(county) %>%
      filter(max(I) > 100)
 
-forNYS$I[forNYS$I == 0] <- NA
-clength <- length(unique(forNYS$county))
-CSD <- tibble(
+ forNYS$I[forNYS$I == 0] <- NA
+
+ clength <- length(unique(forNYS$county))
+ CSD <- tibble(
      "County" = unique(forNYS$county),
+     "countyFIPS" = forNYS$f,
      b = rep.int(0, clength),
      a = rep.int(0, clength),
      d = rep.int(0, clength),
      g = rep.int(0, clength),
+     h = rep.int(0, clength),
      y_int1 = rep.int(0, clength),
      y_int2 = rep.int(0, clength),
      y_int3 = rep.int(0, clength)
-)
-for (c in unique(forNYS$county)) {
-     x <-
-          lm(log10(I) ~ t, data = filter(forNYS, t <= as.Date("2020-03-20") &
-                                              county == c), na.action=na.omit)
-     y <-
-          lm(log10(I) ~ t, data = filter(forNYS, t >= as.Date("2020-04-03") & t <= as.Date("2020-06-01") &
-                                              county == c), na.action=na.omit)
-     y2 <- lm(log10(I) ~ t, data = filter(forNYS, t >= as.Date("2020-06-01") &
-                                              county == c), na.action=na.omit)
-     z <-
-          10 ^ (predict(x, data.frame(t = as.Date("2020-04-03")))) - 10 ^ y$fitted.values[1]
-     CSD$b[CSD$County == c] <- 10^x$coefficients[2]
-     CSD$a[CSD$County == c] <- 10^y$coefficients[2]
-     CSD$d[CSD$County == c] <- 10^(x$coefficients[2] - y$coefficients[2])
-     CSD$g[CSD$County == c] <- z
-     CSD$h[CSD$County == c] <- 10^y2$coefficients[2]
-     CSD$y_int1[CSD$County == c] <- 10^tail(x$fitted.values, 1)
-     CSD$y_int2[CSD$County == c] <- 10^(tail(x$fitted.values, 1)+14*x$coefficients[2])
-     CSD$y_int3[CSD$County == c] <- 10^y$model$`log10(I)`[1]
-}
+ )
+# for (c in unique(forNYS$county)) {
+#     x <-
+#          lm(log10(I) ~ t, data = filter(forNYS, t <= as.Date("2020-03-20") &
+#                                              county == c), na.action=na.omit)
+#     y <-
+#          lm(log10(I) ~ t, data = filter(forNYS, t >= as.Date("2020-04-03") & t <= as.Date("2020-06-01") &
+#                                              county == c), na.action=na.omit)
+#     y2 <- lm(log10(I) ~ t, data = filter(forNYS, t >= as.Date("2020-06-01") &
+#                                              county == c), na.action=na.omit)
+#     z <-
+#          10 ^ (predict(x, data.frame(t = as.Date("2020-04-03")))) - 10 ^ y$fitted.values[1]
+#     CSD$b[CSD$County == c] <- 10^x$coefficients[2]
+#     CSD$a[CSD$County == c] <- 10^y$coefficients[2]
+#     CSD$d[CSD$County == c] <- 10^(x$coefficients[2] - y$coefficients[2])
+#     CSD$g[CSD$County == c] <- z
+#     CSD$h[CSD$County == c] <- 10^y2$coefficients[2]
+#     CSD$y_int1[CSD$County == c] <- 10^tail(x$fitted.values, 1)
+#     CSD$y_int2[CSD$County == c] <- 10^(tail(x$fitted.values, 1)+14*x$coefficients[2])
+#     CSD$y_int3[CSD$County == c] <- 10^y$model$`log10(I)`[1]
+# }
 
-CSD <- CSD %>%
-     arrange(desc(g)) %>%
-     mutate(
-          "SlopeBefore" = round(b, 3),
-          "SlopeAfter" = round(a, 3),
-          "SlopeDiff" = round(d, 3),
-          "EffectSize" = round(g, 0),
-          "SlopeOpen" = round(h, 3),
-          "countyFIPS" = fips("NY", county = County)
-     ) %>%
-     select(
-          County,
-          "countyFIPS",
-          "SlopeBefore",
-          "SlopeAfter",
-          "SlopeDiff",
-          "EffectSize",
-          "SlopeOpen",
-          y_int1,
-          y_int2,
-          y_int3
-     )
+# CSD <- CSD %>%
+#     arrange(desc(g)) %>%
+#     mutate(
+#          "SlopeBefore" = round(b, 3),
+#          "SlopeAfter" = round(a, 3),
+#          "SlopeDiff" = round(d, 3),
+#          "EffectSize" = round(g, 0),
+#          "SlopeOpen" = round(h, 3),
+#          "countyFIPS" = fips("NY", county = County)
+#     ) %>%
+#     select(
+#          County,
+#          "countyFIPS",
+#          "SlopeBefore",
+#          "SlopeAfter",
+#          "SlopeDiff",
+#          "EffectSize",
+#          "SlopeOpen",
+#          y_int1,
+#          y_int2,
+#          y_int3
+#     )
 
-forNYS <- forNYS %>% 
+ forNYS <- forNYS %>% 
      inner_join(CSD, by = c("county"="County"))
 
 #####################################################
@@ -846,21 +850,21 @@ ggplot(data = forNYS) +
      geom_point(data = filter(forNYS, t == max(t)),
              mapping = aes(x = t, y = I),
              color = "red") +
-     geom_rect(
-          aes(
-               xmin = as.Date("2020-03-20"),
-               xmax = as.Date("2020-04-03"),
-               ymin = 0,
-               ymax = Inf
-          ),
-          fill = "gray100",
-          alpha = 0.01
-     ) +
+#     geom_rect(
+#          aes(
+#               xmin = as.Date("2020-03-20"),
+#               xmax = as.Date("2020-04-03"),
+#               ymin = 0,
+#               ymax = Inf
+#          ),
+#          fill = "gray100",
+#          alpha = 0.01
+#     ) +
      labs(x = NULL,
           y = "New Cases per Day") +
      scale_y_log10(labels = comma) +
-     geom_vline(xintercept = as.Date("2020-03-20"), linetype = 4) +
-     geom_vline(xintercept = as.Date("2020-06-01"), linetype = 4) + 
+#     geom_vline(xintercept = as.Date("2020-03-20"), linetype = 4) +
+#     geom_vline(xintercept = as.Date("2020-06-01"), linetype = 4) + 
      geom_label_repel(
           data = filter(forNYS, t == max(t)),
           aes(
@@ -874,76 +878,76 @@ ggplot(data = forNYS) +
           nudge_x = -10,
           nudge_y = 1
      ) +
-     geom_smooth(
-          data = filter(forNYS, t <= as.Date("2020-03-20")),
-          mapping = aes(x = t, y = I),
-          colour = "red",
-          method = lm,
-          na.rm = TRUE,
-          se = FALSE
-     ) +
-     geom_smooth(
-          data = filter(forNYS, t >= as.Date("2020-04-03") & t <= as.Date("2020-06-01")),
-          mapping = aes(x = t, y = I),
-          colour = "green",
-          method = lm,
-          na.rm = TRUE,
-          se = FALSE
-     ) +
-     geom_smooth(
-          data = filter(forNYS, t >= as.Date("2020-06-01")),
-          mapping = aes(x = t, y = I),
-          colour = "yellow",
-          method = lm,
-          na.rm = TRUE,
-          se = FALSE
-     ) +
-     geom_segment(
-          aes(
-               x = as.Date("2020-03-20"),
-               y = y_int1,
-               xend = as.Date("2020-04-03"),
-               yend = y_int2
-          ),
-          linetype = 2,
-          color = "red",
-          show.legend = NA
-     ) +
-     geom_segment(
-          aes(
-               x    = as.Date("2020-04-03"),
-               y    = y_int2,
-               xend = as.Date("2020-04-03"),
-               yend = y_int3
-          ),
-          linetype = 2,
-          color = "black",
-          show.legend = NA
-     ) +
-     geom_text(
-          aes(
-               label = sprintf("Effect Size is %.0f", EffectSize),
-               x = as.Date("2020-04-05"),
-               y = 100000
-               ),
-          hjust=0
-          ) +
-     geom_text(
-          aes(
-               label = sprintf("Difference in Slope is %.3f", SlopeDiff),
-               x = as.Date("2020-04-05"),
-               y = 50000
-               ),
-          hjust=0
-          ) +
-     geom_text(
-          aes(
-               label = sprintf("Slope is %.3f", SlopeOpen),
-               x = as.Date("2020-06-05"),
-               y = 100000
-               ),
-          hjust=0
-          ) +  
+#     geom_smooth(
+#          data = filter(forNYS, t <= as.Date("2020-03-20")),
+#          mapping = aes(x = t, y = I),
+#          colour = "red",
+#          method = lm,
+#          na.rm = TRUE,
+#          se = FALSE
+#     ) +
+#     geom_smooth(
+#          data = filter(forNYS, t >= as.Date("2020-04-03") & t <= as.Date("2020-06-01")),
+#          mapping = aes(x = t, y = I),
+#          colour = "green",
+#          method = lm,
+#          na.rm = TRUE,
+#          se = FALSE
+#     ) +
+#     geom_smooth(
+#          data = filter(forNYS, t >= as.Date("2020-06-01")),
+#          mapping = aes(x = t, y = I),
+#          colour = "yellow",
+#          method = lm,
+#          na.rm = TRUE,
+#          se = FALSE
+#     ) +
+#     geom_segment(
+#          aes(
+#               x = as.Date("2020-03-20"),
+#               y = y_int1,
+#               xend = as.Date("2020-04-03"),
+#               yend = y_int2
+#          ),
+#          linetype = 2,
+#          color = "red",
+#          show.legend = NA
+#     ) +
+#     geom_segment(
+#          aes(
+#               x    = as.Date("2020-04-03"),
+#               y    = y_int2,
+#               xend = as.Date("2020-04-03"),
+#               yend = y_int3
+#          ),
+#          linetype = 2,
+#          color = "black",
+#          show.legend = NA
+#     ) +
+#     geom_text(
+#          aes(
+#               label = sprintf("Effect Size is %.0f", EffectSize),
+#               x = as.Date("2020-04-05"),
+#               y = 100000
+#               ),
+#          hjust=0
+#          ) +
+ #    geom_text(
+ #         aes(
+ #              label = sprintf("Difference in Slope is %.3f", SlopeDiff),
+ #              x = as.Date("2020-04-05"),
+ #              y = 50000
+ #              ),
+ #         hjust=0
+ #         ) +
+#     geom_text(
+#          aes(
+#               label = sprintf("Slope is %.3f", SlopeOpen),
+#               x = as.Date("2020-06-05"),
+#               y = 100000
+#               ),
+#          hjust=0
+#          ) +  
      facet_wrap(vars(county), ncol = 4) +
      facet_theme +
      ggtitle(label="New Cases by County", subtitle = "Counties with a maximum of over 100 New Cases on a single day")
@@ -954,56 +958,56 @@ ggplot(data = forNYS) +
 <p class="intro">The Effect Size is the estimated number of lives saved by actions such as sheltering at home, social distancing, and wearing masks.  Note that the greatest changes in the Effect Size are in the largest and heaviest hit counties.</p>
 
 
-```{r County Slope Difference, fig.width=7.5, fig.height=7.5}
-CSD %>%
-  inner_join(NYpop, by = c("countyFIPS" = "GEOID")) %>% 
-  ggplot(
-  aes(
-    y=fct_reorder(County, EffectSize/estimate), 
-    x = EffectSize/estimate, 
-    size = estimate, 
-    color = estimate)
-  ) + 
-geom_point() +
-annotate(
-  geom = "rect", 
-  xmin = c(0, 0.05, .1, .15),
-  xmax = c(0.05, .1, .15, .2),
-  ymin = -Inf,
-  ymax = Inf,
-  fill = c(o_i_colors[1:4]),
-  alpha = 0.1) +
-scale_color_viridis_c() + 
-scale_x_continuous(
-  labels = percent,
-  limits = c(0, 0.2)) +
-guides(
-  color = guide_legend(title = "Population"), 
-  size = guide_legend(title = "Population")
-  ) +
-labs(
-  x="Effect Size as percent of Population",
-  y=NULL) +
-ggtitle(label = "Social Distancing Effect Size by County", subtitle = "Counties with more than 100 cases in a day") +
-plot_theme  
-```
+# ```{r County Slope Difference, fig.width=7.5, fig.height=7.5}
+# CSD %>%
+#  inner_join(NYpop, by = c("countyFIPS" = "GEOID")) %>%
+#  ggplot(
+#  aes(
+#    y=fct_reorder(County, EffectSize/estimate),
+#    x = EffectSize/estimate,
+#    size = estimate,
+#    color = estimate)
+#  ) +
+# geom_point() +
+# annotate(
+#  geom = "rect",
+#  xmin = c(0, 0.05, .1, .15),
+#  xmax = c(0.05, .1, .15, .2),
+#  ymin = -Inf,
+#  ymax = Inf,
+#  fill = c(o_i_colors[1:4]),
+#  alpha = 0.1) +
+# scale_color_viridis_c() +
+# scale_x_continuous(
+#  labels = percent,
+#  limits = c(0, 0.2)) +
+# guides(
+#  color = guide_legend(title = "Population"),
+#  size = guide_legend(title = "Population")
+#  ) +
+# labs(
+#  x="Effect Size as percent of Population",
+#  y=NULL) +
+# ggtitle(label = "Social Distancing Effect Size by County", subtitle = "Counties with more than 100 cases in a day") +
+# plot_theme
+# ```
 
-<p class="intro">However, even though the relation between Effect size and Population Size does appear linear, there is a large amount of variance that has not  been explained.</p>
+# <p class="intro">However, even though the relation between Effect size and Population Size does appear linear, there is a large amount of variance that has not  been explained.</p>
 
 ```{r Effect Size vs. Population, fig.width=7.5, fig.height=5}
-data1 <- CSD %>%
+ data1 <- CSD %>%
   inner_join(NYpop, by = c("countyFIPS" = "GEOID"))
 
-data2 <- CSD %>%
+ data2 <- CSD %>%
   inner_join(NYpop, by = c("countyFIPS" = "GEOID")) %>%
   filter(estimate > 1000000)
 
-ggplot(
+ ggplot(
     data1,
     aes(
-      y = EffectSize, 
+      y = EffectSize,
       x = estimate)
-    ) + 
+    ) +
   geom_point() +
   geom_smooth(method = lm) +
   geom_label_repel(
@@ -1149,16 +1153,16 @@ ggplot(data = nys) +
      geom_point(data = filter(nys, t == max(t)),
              mapping = aes(x = t, y = I*100/T),
              color = "red") +
-  geom_rect(
-    aes(
-      xmin = as.Date("2020-03-20"),
-      xmax = as.Date("2020-04-03"),
-      ymin = 0,
-      ymax = Inf
-    ),
-    fill = "gray100",
-    alpha = 0.01
-  ) +    
+#  geom_rect(
+#    aes(
+#      xmin = as.Date("2020-03-20"),
+#      xmax = as.Date("2020-04-03"),
+#      ymin = 0,
+#      ymax = Inf
+#    ),
+#    fill = "gray100",
+#    alpha = 0.01
+#  ) +    
      geom_smooth(mapping = aes(x = t, y = I * 100 / T)) +
      geom_label_repel(
           data = filter(nys, t == max(t)),
