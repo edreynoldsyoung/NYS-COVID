@@ -256,12 +256,6 @@ USpop <- tryCatch({
 ## The window for estimating Rt can be adjusted using t_start and t_end.
 ## The default setting for the window is 7 days
 
-
-R.instantaneous <- estimate_R(state$SI,
-                              method = "parametric_si",
-                              config = list(mean_si = 3.96,
-                                            std_si = 4.75))
-
 ###### Setup for estimating Rt
 
 ## 1. Start with a data.frame that has the following columns: fips, date, incidence
@@ -271,52 +265,51 @@ R.instantaneous <- estimate_R(state$SI,
 ## 5. Assign those values to an ROutput data.frame
 
 
-makeRoutput <- function(df, tn) {
-     lof <-
-          df %>% select(f) %>% unique() %>% filter(!is.na(f)) %>% as.list()
-     ROutput <- tibble(
-          f = lof$f,
-          R = 0,
-          Std = 0,
-          Confl = 0,
-          Confh = 0
-     )
-     for (fips in lof$f) {
-          x <- df %>% filter(f == fips, !is.na(I)) %>% select(I) %>% sum()
-          y <-
-               df %>% filter(f == fips, !is.na(I)) %>% select(I) %>% lengths()
-          if (x * 7 / y > 11) {
-               t_start <- seq(2, y - tn)
-               t_end <- t_start + tn
-               R0 <- estimate_R(
-                    incid = df %>% filter(f == fips, !is.na(I)) %>% select(I),
-                    method = "parametric_si",
-                    config = make_config(
-                         list(
-                              mean_si = 3.96,
-                              std_si = 4.75,
-                              t_start = t_start,
-                              t_end = t_end
-                         )
-                    )
-               )
-               n <- length(R0$R$t_start)
-               std <- round(R0$R$'Std(R)'[n], 3)
-               R <- round(R0$R$'Mean(R)'[n], 3)
-               ROutput$R[ROutput$f == fips] <- R
-               ROutput$Std[ROutput$f == fips] <- std
-               ROutput$Confl[ROutput$f == fips] <-
-                    R - 1.96 * std / sqrt(n)
-               ROutput$Confh[ROutput$f == fips] <-
-                    R + 1.96 * std / sqrt(n)
-          } else {
-               ROutput$R[ROutput$f == fips] <- NA
-               ROutput$Std[ROutput$f == fips] <- NA
-               ROutput$Confl[ROutput$f == fips] <- NA
-               ROutput$Confh[ROutput$f == fips] <- NA
-          }
-     }
-     return(ROutput)
+# Function to estimate R for a single FIPS code
+estimate_R_for_fips <- function(df, fips, time_window) {
+  incid_data <- df %>% 
+    filter(f == fips, !is.na(I)) %>% 
+    pull(I)
+  
+  total_cases <- sum(incid_data)
+  num_days <- length(incid_data)
+  
+  if (total_cases * 7 / num_days > 11) {
+    t_start <- seq(2, num_days - time_window)
+    t_end <- t_start + time_window
+    R0 <- estimate_R(
+      incid = incid_data,
+      method = "parametric_si",
+      config = make_config(
+        list(
+          mean_si = 3.96,
+          std_si = 4.75,
+          t_start = t_start,
+          t_end = t_end
+        )
+      )
+    )
+    n <- length(R0$R$t_start)
+    std <- round(R0$R$'Std(R)'[n], 3)
+    R <- round(R0$R$'Mean(R)'[n], 3)
+    conf_l <- R - 1.96 * std / sqrt(n)
+    conf_h <- R + 1.96 * std / sqrt(n)
+    return(data.frame(f = fips, R = R, Std = std, Confl = conf_l, Confh = conf_h))
+  } else {
+    return(data.frame(f = fips, R = NA, Std = NA, Confl = NA, Confh = NA))
+  }
+}
+
+# Main function to estimate R for all FIPS codes
+makeRoutput <- function(df, time_window) {
+  lof <- df %>% 
+    distinct(f) %>% 
+    filter(!is.na(f)) %>% 
+    pull(f)
+  
+  ROutput <- purrr::map_dfr(lof, ~ estimate_R_for_fips(df, ., time_window))
+  
+  return(ROutput)
 }
 
 ROutput.NY <- makeRoutput(nys, 7)
