@@ -227,23 +227,28 @@ ny_map <- tryCatch({
   NULL
 })
 
-## Download census data
-## Munge
+# Download and process New York county population data
+NYpop <- tryCatch({
+  get_acs(geography = "county",
+          state = 36,
+          variables = "B01003_001") %>%
+    select(GEOID, "Population" = estimate)  # Rename 'estimate' to 'Population'
+}, error = function(e) {
+  message("Failed to download New York county population data: ", e)
+  return(NULL)
+})
 
-NYpop <-
-     get_acs(geography = "county",
-             state = 36,
-             variables = "B01003_001") %>%
-     select(GEOID,  estimate)
-
-USpop <-
-     get_acs(geography = "state",
-             variables = "B01003_001") %>%
-     filter(GEOID < 60) %>%
-     mutate("f" = as.character(as.numeric(GEOID))) %>%
-     select(f,
-            "State" = NAME,
-            "Population" = estimate)
+# Download and process U.S. state population data
+USpop <- tryCatch({
+  get_acs(geography = "state",
+          variables = "B01003_001") %>%
+    filter(GEOID < 60) %>%
+    mutate(f = as.character(GEOID)) %>%  # Convert GEOID to character
+    select(f, "State" = NAME, "Population" = estimate)  # Rename columns
+}, error = function(e) {
+  message("Failed to download U.S. state population data: ", e)
+  return(NULL)
+})
 
 
 
