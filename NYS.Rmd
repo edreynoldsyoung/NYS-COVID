@@ -206,19 +206,26 @@ NYCountyDeaths <- USDeaths %>%
   mutate(d = deaths - lag(deaths, n = 1, default = 0)) %>%
   ungroup()
 
-## Download US State map
+# Download US State map data
+United_States_map <- tryCatch({
+  states() %>%
+    filter(STATEFP < 60) %>%  # Filter out non-state regions
+    mutate(f = as.character(STATEFP)) %>%  # Convert STATEFP to character
+    select(f, STUSPS)  # Select relevant columns
+}, error = function(e) {
+  message("Failed to download United States map data: ", e)
+  NULL
+})
 
-United_States_map <- states() %>%
-     filter(STATEFP < 60) %>%
-     mutate(f = as.character(as.numeric(STATEFP))) %>%
-     select(f, STUSPS)
-
-## Download New York County map data
-
-ny_map <- counties(state = 36) %>%
-     mutate(f = paste0(STATEFP, COUNTYFP)) %>%
-     select(GEOID, County = NAME, f)
-
+# Download New York County map data
+ny_map <- tryCatch({
+  counties(state = 36) %>%  # Filter for New York state (FIPS code 36)
+    mutate(f = paste0(STATEFP, COUNTYFP)) %>%  # Create full FIPS code
+    select(GEOID, County = NAME, f)  # Select relevant columns
+}, error = function(e) {
+  message("Failed to download New York County map data: ", e)
+  NULL
+})
 
 ## Download census data
 ## Munge
