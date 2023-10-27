@@ -113,34 +113,48 @@ if (!is.null(nys)) {
     )
 }
 
-
 ## Download latest national data at State level from New York Times
 ## Munge
 
-Cases <-
-     read.csv(
-          "https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-states.csv",
-          header = TRUE,
-          sep = ","
-     ) %>%
-     filter(fips < 60) %>%
-     mutate(
-          date = as.Date(date),
-          state = as.character(state),
-          f = as.character(as.numeric(fips))
-     ) %>%
-     arrange(f, date) %>%
-     as_tibble()
-Cases2 <- Cases %>%
-     select(f, date, cases) %>%
-     arrange(f, date) %>%
-     group_by(f) %>%
-     mutate(I = if_else(
-          cases - lag(cases, n = 1, default = 0) > 0,
-          cases - lag(cases, n = 1, default = 0),
-          0
-     )) %>%
-     ungroup()
+# Function to download and preprocess data
+download_and_process_data <- function() {
+  # Error handling for data download
+  cases_data <- tryCatch(
+    {
+      readr::read_csv("https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-states.csv")
+    },
+    error = function(e) {
+      message("Failed to download data: ", e)
+      return(NULL)
+    }
+  )
+  
+  # Return NULL if download failed
+  if (is.null(cases_data)) return(NULL)
+  
+  # Data preprocessing
+  cases_processed <- cases_data %>%
+    filter(fips < 60) %>%
+    mutate(
+      date = as.Date(date),
+      state = as.character(state),
+      f = as.character(as.numeric(fips))
+    ) %>%
+    arrange(f, date) %>%
+    # Calculate incremental cases
+    group_by(f) %>%
+    mutate(I = if_else(
+      cases - lag(cases, n = 1, default = 0) > 0,
+      cases - lag(cases, n = 1, default = 0),
+      0
+    )) %>%
+    ungroup()
+  
+  return(cases_processed)
+}
+
+# Download and process data
+Cases2 <- download_and_process_data()
 
 ## Download data on deaths at County level from NY Times
 ## Munge
