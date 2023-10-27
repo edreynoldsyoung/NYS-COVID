@@ -59,28 +59,60 @@ options(tigris_use_cache = TRUE)
 ## Download latest NY State data from health.data.ny.gov
 ## Munge
 
-nys <-
-     read.socrata("https://health.data.ny.gov/resource/xdss-u53e.json") %>%
-     select(t = test_date,
-            I = new_positives,
-            C = cumulative_number_of_positives,
-            T = total_number_of_tests,
-            county) %>%
-     filter(!county %in% c("Capital Region", "Central New York", "Finger Lakes", "Long Island", "Mid-Hudson", "Mohawk Valley", "New York City", "North Country", "Out-of-State", "STATEWIDE", "Southern Tier", "Western New York")) %>%
-     mutate(
-          t = as.Date(t),
-          I = as.integer(I),
-          C = as.integer(C),
-          T = as.integer(T),
-          f = fips("NY", county = county)
-     ) %>%
-     arrange(f, t)
+# Function to read and process NYS health data
+read_process_nys_data <- function() {
+  # Error handling for API call
+  nys_data <- tryCatch(
+    {
+      read.socrata("https://health.data.ny.gov/resource/xdss-u53e.json")
+    },
+    error = function(e) {
+      message("Failed to read data: ", e)
+      return(NULL)
+    }
+  )
+  
+  if (is.null(nys_data)) return(NULL)
+  
+  # Data transformation
+  nys_cleaned <- nys_data %>%
+    select(
+      t = test_date,
+      I = new_positives,
+      C = cumulative_number_of_positives,
+      T = total_number_of_tests,
+      county
+    ) %>%
+    filter(!county %in% c("Capital Region", "Central New York", "Finger Lakes", 
+                          "Long Island", "Mid-Hudson", "Mohawk Valley", 
+                          "New York City", "North Country", "Out-of-State", 
+                          "STATEWIDE", "Southern Tier", "Western New York")) %>%
+    mutate(
+      t = as.Date(t),
+      I = as.integer(I),
+      C = as.integer(C),
+      T = as.integer(T),
+      f = fips("NY", county = county)
+    ) %>%
+    arrange(f, t)
+  
+  return(nys_cleaned)
+}
 
-state <- nys %>%
-     group_by(t) %>%
-     summarise(SI = sum(I),
-               SC = sum(C),
-               ST = sum(T))
+# Read and process data
+nys <- read_process_nys_data()
+
+# State-level aggregation
+if (!is.null(nys)) {
+  state <- nys %>%
+    group_by(t) %>%
+    summarise(
+      SI = sum(I, na.rm = TRUE),
+      SC = sum(C, na.rm = TRUE),
+      ST = sum(T, na.rm = TRUE)
+    )
+}
+
 
 ## Download latest national data at State level from New York Times
 ## Munge
