@@ -159,32 +159,52 @@ Cases2 <- download_and_process_data()
 ## Download data on deaths at County level from NY Times
 ## Munge
 
-USDeaths <-
-     read.csv(
-          "https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv",
-          header = TRUE,
-          sep = ","
-     ) %>%
-     mutate(
-          date = as.Date(date),
-          county = as.character(county),
-          state = as.character(state)
-     ) %>%
-     as_tibble()
+# Function to download and preprocess data
+download_and_process_death_data <- function() {
+  # Error handling for data download
+  deaths_data <- tryCatch(
+    {
+      readr::read_csv("https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv")
+    },
+    error = function(e) {
+      message("Failed to download data: ", e)
+      return(NULL)
+    }
+  )
+  
+  # Return NULL if download failed
+  if (is.null(deaths_data)) return(NULL)
+  
+  # Data preprocessing
+  deaths_processed <- deaths_data %>%
+    mutate(
+      date = as.Date(date),
+      county = as.character(county),
+      state = as.character(state)
+    )
+  
+  return(deaths_processed)
+}
+
+# Download and process data
+USDeaths <- download_and_process_death_data()
+
+# Aggregate data for New York State
 NYDeaths <- USDeaths %>%
-     filter(state == "New York") %>%
-     select(date, deaths) %>%
-     group_by(date) %>%
-     summarise(SD = sum(deaths)) %>%
-     mutate(d = SD - lag(SD, n = 1, default = 0)) %>%
-     ungroup()
+  filter(state == "New York") %>%
+  group_by(date) %>%
+  summarise(SD = sum(deaths, na.rm = TRUE)) %>%
+  mutate(d = SD - lag(SD, n = 1, default = 0)) %>%
+  ungroup()
+
+# Aggregate data for counties in New York State
 NYCountyDeaths <- USDeaths %>%
-     filter(state == "New York" & county != "Unknown") %>%
-     select(county, date, deaths) %>%
-     group_by(county) %>%
-     arrange(county, date) %>%
-     mutate(d = deaths - dplyr::lag(deaths, n = 1, default = 0)) %>%
-     ungroup()
+  filter(state == "New York" & county != "Unknown") %>%
+  select(county, date, deaths) %>%
+  group_by(county) %>%
+  arrange(county, date) %>%
+  mutate(d = deaths - lag(deaths, n = 1, default = 0)) %>%
+  ungroup()
 
 ## Download US State map
 
