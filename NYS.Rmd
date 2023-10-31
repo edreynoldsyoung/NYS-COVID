@@ -48,17 +48,17 @@ check_load_pkgs <- function(packages) {
     }
     # Attempt to load package
     load_status <- tryCatch({
-      library(package, character.only = TRUE)
+      library(pkg, character.only = TRUE)
       return(TRUE)
     }, error = function(e) {
-      return(paste("Failed to load", package, "Error:", e))
+      return(paste("Failed to load", pkg, "Error:", e))
     })
     
     # Check load status
     if (inherits(load_status, "try-error")) {
       message(load_status)
     } else {
-      message(paste("Successfully loaded:", package))
+      message(paste("Successfully loaded:", pkg))
     }
   }
 }
