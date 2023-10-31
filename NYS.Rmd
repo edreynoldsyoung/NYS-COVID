@@ -24,12 +24,13 @@ knitr::opts_chunk$set(
 ## Census API Key is required:  http://api.census.gov/data/key_signup.html
 ## Once acquired, the Census API Key should be included in #HOME/.Renviron file
 ## First line in file should be:  CENSUS_API_KEY = 'ID'
-check_load_pkgs <- function() {
-  # List of packages to check and possibly install
-  packages <- c("tidyverse", "ggrepel", "lubridate", "EpiEstim", "RSocrata", 
-                "knitr", "sf", "tigris", "usmap", "tidycensus", 
-                "scales", "viridis", "ggridges")
+# List of packages to check and possibly install
+packages <- c("tidyverse", "ggrepel", "lubridate", "EpiEstim", "RSocrata", 
+              "knitr", "sf", "tigris", "usmap", "tidycensus", 
+              "scales", "viridis", "ggridges")
   
+check_load_pkgs <- function(packages) {
+
   # Loop through each package to check if it is installed
   for (pkg in packages) {
     if (!requireNamespace(pkg, quietly = TRUE)) {
@@ -45,11 +46,25 @@ check_load_pkgs <- function() {
         }
       )
     }
+    # Attempt to load package
+    load_status <- tryCatch({
+      library(package, character.only = TRUE)
+      return(TRUE)
+    }, error = function(e) {
+      return(paste("Failed to load", package, "Error:", e))
+    })
+    
+    # Check load status
+    if (inherits(load_status, "try-error")) {
+      message(load_status)
+    } else {
+      message(paste("Successfully loaded:", package))
+    }
   }
 }
 
 # Run the function to check and install packages
-check_load_pkgs()
+check_load_pkgs(packages)
 
 # Options related to tigris package
 # These options set tigris to use 'sf' class and enable caching
